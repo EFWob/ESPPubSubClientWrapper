@@ -114,10 +114,12 @@ public:
 #define STATE_MQTT_LOOP		 	3
 ESPPubSubClient::ESPPubSubClient (char* domain, uint16_t port) :PubSubClient(domain, port, _wiFiClient) {
 //	_client = new PubSubClient(domain, port);
+	StatemachineLooper.add(this);
 };
 
 ESPPubSubClient::ESPPubSubClient(uint8_t* ipaddr, uint16_t port) :PubSubClient(ipaddr, port, _wiFiClient) {
 //	_client = new PubSubClient(ipaddr, port, *(new WiFiClient));
+	StatemachineLooper.add(this);
 };
 
 /*
@@ -311,19 +313,19 @@ void ESPPubSubClient::setConnect(const char *id, const char *user, const char *p
 void ESPPubSubClient::receivedCallback(char* topic, uint8_t* payload, unsigned int payloadLen) {
 bool found = false;
 int i;
-	Serial.print("Checking callbacks! Topic: ");
-	Serial.println(topic);
+//	Serial.print("Checking callbacks! Topic: ");
+//	Serial.println(topic);
 	for (i = 0; (i < _onEvents.size()) && !found;) {
 		if (_onEvents[i]->subscribed)
 			{
-			Serial.print("...match with: \"");Serial.print(_onEvents[i]->topic);Serial.print("\"??: ");
+//			Serial.print("...match with: \"");Serial.print(_onEvents[i]->topic);Serial.print("\"??: ");
 			if (_onEvents[i]->hasLevelWildcard)
 				found = _onEvents[i]->topicMatch(topic);
 			else if (_onEvents[i]->hasHash)
 				found = (0 == strncmp(topic, _onEvents[i]->topic, _onEvents[i]->hasHash - 1));
 			else
 				found = (0 == strcmp(topic, _onEvents[i]->topic));
-			Serial.println(found);
+//			Serial.println(found);
 			if (!found)
 				i++;
 			}
