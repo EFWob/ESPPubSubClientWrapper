@@ -3,6 +3,7 @@
 #include <BasicStatemachine.h>
 #include <PubSubClient.h>
 #include <deque>
+#include <vector>
 #if defined(ESP8266)
 #include <ESP8266WiFi.h>
 //#include <ESP8266WebServer.h>
@@ -56,10 +57,12 @@ class ESPPubSubClient : public BasicStatemachine, public PubSubClient {
 	bool _connect_cleanSession = true;
 	std::vector<onEventItem *> _onEvents ;              
 #if defined(QUEUE_CALLBACKS)	
-	std::deque<PendingCallbackItem *>  _pendingCallbacks;
+//	std::deque<PendingCallbackItem *>  _pendingCallbacks;
+	std::vector<PendingCallbackItem *> _pendingCallbacks;
 #endif	
 #if defined(PUBLISH_WAITCONNECTED)
-	std::deque<WaitingPublishItem *>  _waitingPublishs;
+//	std::deque<WaitingPublishItem *>  _waitingPublishs;
+	std::vector<WaitingPublishItem *>  _waitingPublishs;
 	
 #endif
 };
@@ -115,11 +118,21 @@ public:
 ESPPubSubClient::ESPPubSubClient (char* domain, uint16_t port) :PubSubClient(domain, port, _wiFiClient) {
 //	_client = new PubSubClient(domain, port);
 	StatemachineLooper.add(this);
+#if defined(QUEUE_CALLBACKS1)
+	PendingCallbackItem dummy("", NULL, 0, NULL);
+	_pendingCallbacks.push_back(&dummy);
+	_pendingCallbacks.pop_front();
+#endif
 };
 
 ESPPubSubClient::ESPPubSubClient(uint8_t* ipaddr, uint16_t port) :PubSubClient(ipaddr, port, _wiFiClient) {
 //	_client = new PubSubClient(ipaddr, port, *(new WiFiClient));
 	StatemachineLooper.add(this);
+#if defined(QUEUE_CALLBACKS1)
+	PendingCallbackItem dummy("", NULL, 0, NULL);
+	_pendingCallbacks.push_back(&dummy);
+	_pendingCallbacks.pop_front();
+#endif
 };
 
 /*
@@ -172,7 +185,8 @@ int wifiStatus = WiFi.status();
 #if defined(QUEUE_CALLBACKS)
 	while (_pendingCallbacks.size() > 0) {
 		PendingCallbackItem *callBackItem = _pendingCallbacks[0];
-		_pendingCallbacks.pop_front();
+//		_pendingCallbacks.pop_front();
+		_pendingCallbacks.erase(_pendingCallbacks.begin());
 //		publish("Garage/delayedCallback", callBackItem->_topic);
 		if (callBackItem->callback)
 			callBackItem->callback(callBackItem->_topic, callBackItem->_payload, callBackItem->_payloadLen);
@@ -244,7 +258,8 @@ int wifiStatus = WiFi.status();
 #if defined(PUBLISH_WAITCONNECTED)				
 				if (_waitingPublishs.size() > 0) {
 					WaitingPublishItem *publishItem = _waitingPublishs[0];
-					_waitingPublishs.pop_front();
+//					_waitingPublishs.pop_front();
+					_waitingPublishs.erase(_waitingPublishs.begin());
 					PubSubClient::publish(publishItem->_topic, publishItem->_payload, 
 							publishItem->_plength, publishItem->_retained);
 					delete publishItem;
