@@ -1,8 +1,8 @@
-#ifndef ESPPubSubClient_h
-#define ESPPubSubClient_h
+#ifndef ESPPubSubClientWrapper_h
+#define ESPPubSubClientWrapper_h
 #include <BasicStatemachine.h>
 #include <PubSubClient.h>
-#include <deque>
+//#include <deque>
 #include <vector>
 #if defined(ESP8266)
 #include <ESP8266WiFi.h>
@@ -20,10 +20,10 @@ class PendingCallbackItem;
 class WaitingPublishItem;
 
 
-class ESPPubSubClient : public PubSubClient {
+class ESPPubSubClientWrapper : public PubSubClient {
   public:
-	ESPPubSubClient(char *domain, uint16_t port = 1883);
-	ESPPubSubClient(uint8_t *ipaddr, uint16_t port = 1883);
+	ESPPubSubClientWrapper(char *domain, uint16_t port = 1883);
+	ESPPubSubClientWrapper(uint8_t *ipaddr, uint16_t port = 1883);
 //	PubSubClient* getClient();
 //	bool connect();
 //	bool connected();
@@ -90,7 +90,7 @@ public:
 	bool subscribed;
 	MQTT_CALLBACK_SIGNATURE;
 	onEventItem* _next = NULL;
-	friend class ESPPubSubClient;
+	friend class ESPPubSubClientWrapper;
 };
 
 #if defined(QUEUE_CALLBACKS)
@@ -123,7 +123,7 @@ public:
 	unsigned int _payloadLen;
 	MQTT_CALLBACK_SIGNATURE;
 	PendingCallbackItem* _next = NULL;
-	friend class ESPPubSubClient;
+	friend class ESPPubSubClientWrapper;
 };
 #endif
 
@@ -131,7 +131,7 @@ public:
 #define STATE_MQTT_RECONNECT 	1
 #define STATE_MQTT_RESUBSCRIBE  2
 #define STATE_MQTT_LOOP		 	3
-ESPPubSubClient::ESPPubSubClient (char* domain, uint16_t port) :PubSubClient(domain, port, _wiFiClient) {
+ESPPubSubClientWrapper::ESPPubSubClientWrapper (char* domain, uint16_t port) :PubSubClient(domain, port, _wiFiClient) {
 //	_client = new PubSubClient(domain, port);
 //	StatemachineLooper.add(this);
 #if defined(QUEUE_CALLBACKS1)
@@ -141,7 +141,7 @@ ESPPubSubClient::ESPPubSubClient (char* domain, uint16_t port) :PubSubClient(dom
 #endif
 };
 
-ESPPubSubClient::ESPPubSubClient(uint8_t* ipaddr, uint16_t port) :PubSubClient(ipaddr, port, _wiFiClient) {
+ESPPubSubClientWrapper::ESPPubSubClientWrapper(uint8_t* ipaddr, uint16_t port) :PubSubClient(ipaddr, port, _wiFiClient) {
 //	_client = new PubSubClient(ipaddr, port, *(new WiFiClient));
 //	StatemachineLooper.add(this);
 #if defined(QUEUE_CALLBACKS1)
@@ -152,11 +152,11 @@ ESPPubSubClient::ESPPubSubClient(uint8_t* ipaddr, uint16_t port) :PubSubClient(i
 };
 
 /*
-PubSubClient* ESPPubSubClient::getClient() {
+PubSubClient* ESPPubSubClientWrapper::getClient() {
 	return _client;
 }
 
-bool ESPPubSubClient::connected() {
+bool ESPPubSubClientWrapper::connected() {
 	return _client->connected();
 }
 */
@@ -191,8 +191,8 @@ class WaitingPublishItem {
 #endif
 
 
-//void ESPPubSubClient::onEnter(int16_t currentStateNb, int16_t oldStateNb) {
-void ESPPubSubClient::setState(int16_t newState) {
+//void ESPPubSubClientWrapper::onEnter(int16_t currentStateNb, int16_t oldStateNb) {
+void ESPPubSubClientWrapper::setState(int16_t newState) {
 	if (STATE_MQTT_NONE == newState) {
 		for(int i = 0;i < _onEvents.size();i++)
 			_onEvents[i]->subscribed = false;
@@ -212,8 +212,8 @@ void ESPPubSubClient::setState(int16_t newState) {
 }
 
 
-//void ESPPubSubClient::runState(int16_t stateNb) {
-void ESPPubSubClient::loop() {
+//void ESPPubSubClientWrapper::runState(int16_t stateNb) {
+void ESPPubSubClientWrapper::loop() {
 int wifiStatus = WiFi.status();	
 PendingCallbackItem *callBackItem;
 #if defined(QUEUE_CALLBACKS)
@@ -324,23 +324,23 @@ PendingCallbackItem *callBackItem;
 };		
 
 
-void ESPPubSubClient::setConnect(const char *id) {
+void ESPPubSubClientWrapper::setConnect(const char *id) {
     setConnect(id,NULL,NULL,0,0,0,0,1);
 }
 
-void ESPPubSubClient::setConnect(const char *id, const char *user, const char *pass) {
+void ESPPubSubClientWrapper::setConnect(const char *id, const char *user, const char *pass) {
     setConnect(id,user,pass,0,0,0,0,1);
 }
 
-void ESPPubSubClient::setConnect(const char *id, const char* willTopic, uint8_t willQos, boolean willRetain, const char* willMessage) {
+void ESPPubSubClientWrapper::setConnect(const char *id, const char* willTopic, uint8_t willQos, boolean willRetain, const char* willMessage) {
     setConnect(id,NULL,NULL,willTopic,willQos,willRetain,willMessage,1);
 }
 
-void ESPPubSubClient::setConnect(const char *id, const char *user, const char *pass, const char* willTopic, uint8_t willQos, boolean willRetain, const char* willMessage) {
+void ESPPubSubClientWrapper::setConnect(const char *id, const char *user, const char *pass, const char* willTopic, uint8_t willQos, boolean willRetain, const char* willMessage) {
     setConnect(id,user,pass,willTopic,willQos,willRetain,willMessage,1);
 }
 
-void ESPPubSubClient::setConnect(const char *id, const char *user, const char *pass, const char* willTopic, 
+void ESPPubSubClientWrapper::setConnect(const char *id, const char *user, const char *pass, const char* willTopic, 
 		uint8_t willQos, boolean willRetain, const char* willMessage, boolean cleanSession) {
 	if (_connect_id) 
 		free(_connect_id);
@@ -378,7 +378,7 @@ void ESPPubSubClient::setConnect(const char *id, const char *user, const char *p
 	}		
 	
 
-void ESPPubSubClient::receivedCallback(char* topic, uint8_t* payload, unsigned int payloadLen) {
+void ESPPubSubClientWrapper::receivedCallback(char* topic, uint8_t* payload, unsigned int payloadLen) {
 onEventItem* found = NULL;
 int i;
 //	Serial.print("Checking callbacks! Topic: ");
@@ -418,7 +418,7 @@ int i;
 	}
 }
 
-void ESPPubSubClient::on(char* topic, MQTT_CALLBACK_SIGNATURE, uint8_t qos) {
+void ESPPubSubClientWrapper::on(char* topic, MQTT_CALLBACK_SIGNATURE, uint8_t qos) {
 onEventItem *onEvent = new onEventItem(topic, callback, qos);
 	
 	_onEvents.push_back(onEvent);
@@ -463,18 +463,18 @@ char *pattern = topic;
   return (0 == *pattern) || (0 == strcmp(pattern, "#")) || (0 == strcmp(pattern, "+"));
 }
 
-boolean ESPPubSubClient::publish_waitConnected(const char* topic, const char* payload) {
+boolean ESPPubSubClientWrapper::publish_waitConnected(const char* topic, const char* payload) {
 	return(publish_waitConnected(topic, (const uint8_t*) payload, strlen(payload), false));
 }
 
-boolean ESPPubSubClient::publish_waitConnected(const char* topic, const char* payload, boolean retained) {
+boolean ESPPubSubClientWrapper::publish_waitConnected(const char* topic, const char* payload, boolean retained) {
 	return(publish_waitConnected(topic, (const uint8_t*) payload, strlen(payload), retained));
 };
-boolean ESPPubSubClient::publish_waitConnected(const char* topic, const uint8_t * payload, unsigned int plength) {
+boolean ESPPubSubClientWrapper::publish_waitConnected(const char* topic, const uint8_t * payload, unsigned int plength) {
 	return(publish_waitConnected(topic,payload, plength, false));
 }
 
-boolean ESPPubSubClient::publish_waitConnected(const char* topic, const uint8_t * payload, unsigned int plength, boolean retained) {
+boolean ESPPubSubClientWrapper::publish_waitConnected(const char* topic, const uint8_t * payload, unsigned int plength, boolean retained) {
 #if defined(PUBLISH_WAITCONNECTED)
 	if (connected()) {
 		return PubSubClient::publish(topic, payload, plength, retained);
@@ -517,6 +517,26 @@ onEventStruct *ret = this;
 */
 	
 
+class ESPPubSubClient : public ESPPubSubClientWrapper, public BasicStatemachine {
+  public:
+	ESPPubSubClient(char *domain, uint16_t port = 1883);
+	ESPPubSubClient(uint8_t *ipaddr, uint16_t port = 1883);
+  protected:
+    void runState(int16_t stateNb);
+};
+	
+
+ESPPubSubClient::ESPPubSubClient(char *domain, uint16_t port) : ESPPubSubClientWrapper(domain, port) {
+	StatemachineLooper.add(this);
+}
+
+ESPPubSubClient::ESPPubSubClient(uint8_t *ipaddr, uint16_t port): ESPPubSubClientWrapper(ipaddr, port) {
+	StatemachineLooper.add(this);
+}	
+	
+void ESPPubSubClient::runState(int16_t stateNb) {
+	loop();
+}	
 
 
 #endif
