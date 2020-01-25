@@ -56,11 +56,15 @@ class ESPPubSubClient : public BasicStatemachine, public PubSubClient {
 	char* _connect_willMessage = NULL;
 	bool _connect_cleanSession = true;
 	std::vector<onEventItem *> _onEvents ;              
+	onEventItem* _firstOnEvent = NULL;
+	onEventItem* _lastOnEvent = NULL;
+	onEventItem* _subsciptionPending = NULL;
 #if defined(QUEUE_CALLBACKS)	
 //	std::deque<PendingCallbackItem *>  _pendingCallbacks;
 //	std::vector<PendingCallbackItem *> _pendingCallbacks;
 	PendingCallbackItem* _firstPendingCallback = NULL;
 	PendingCallbackItem* _lastPendingCallback = NULL;
+
 #endif	
 #if defined(PUBLISH_WAITCONNECTED)
 //	std::deque<WaitingPublishItem *>  _waitingPublishs;
@@ -82,6 +86,8 @@ public:
 	uint8_t qos;
 	bool subscribed;
 	MQTT_CALLBACK_SIGNATURE;
+	onEventItem* _next = NULL;
+	friend class ESPPubSubClient;
 };
 
 #if defined(QUEUE_CALLBACKS)
@@ -182,10 +188,18 @@ class WaitingPublishItem {
 
 
 void ESPPubSubClient::onEnter(int16_t currentStateNb, int16_t oldStateNb) {
-	if (STATE_MQTT_RECONNECT == currentStateNb)
+	if (STATE_INIT_NONE == currentStateNb) {
+		onEventItem* onEvent = _firstOnEvent;
+		while(onEvent) {
+			onEvent->subscribed = false;
+			onEvent = onEvent->_next;
+		}
+	} else if (STATE_MQTT_RECONNECT == currentStateNb)
 		_firstRetry = true;
-	else if (STATE_MQTT_RESUBSCRIBE == currentStateNb)
+	else if (STATE_MQTT_RESUBSCRIBE == currentStateNb) {
 		_subscribed = 0;
+		_subsciptionPending = _firstOnEvent;
+	}
 }
 void ESPPubSubClient::runState(int16_t stateNb) {
 int wifiStatus = WiFi.status();	
@@ -252,6 +266,16 @@ PendingCallbackItem *callBackItem;
 			}
 			break;
 		case STATE_MQTT_RESUBSCRIBE:
+#ifdef NEWSUBSCRIBE
+				if (NULL == _subsciptionPending)
+					setState(STATE_MQTT_LOOP);
+				else {
+					PubSubClient::loop();
+					_subsciptionPending->subscribed =
+						PubSubClient::subscribe(_subsciptionPending->topic, _subsciptionPending->qos);
+					_subsciptionPending = _subsciptionPending->_next;						
+				}
+#else
 				if (_subscribed >= _onEvents.size())
 					setState(STATE_MQTT_LOOP);
 				else {
@@ -260,6 +284,7 @@ PendingCallbackItem *callBackItem;
 						PubSubClient::subscribe(_onEvents[_subscribed]->topic, _onEvents[_subscribed]->qos);
 					_subscribed++;
 				}
+#endif
 			break;
 		case STATE_MQTT_LOOP:
 			if (!PubSubClient::loop()) {
@@ -341,37 +366,40 @@ void ESPPubSubClient::setConnect(const char *id, const char *user, const char *p
 	
 
 void ESPPubSubClient::receivedCallback(char* topic, uint8_t* payload, unsigned int payloadLen) {
-bool found = false;
+onEventItem* found = NULL;
 int i;
 //	Serial.print("Checking callbacks! Topic: ");
 //	Serial.println(topic);
+#if defined(NEWSUBSCRIBE)
+#else
 	for (i = 0; (i < _onEvents.size()) && !found;) {
 		if (_onEvents[i]->subscribed)
 			{
 //			Serial.print("...match with: \"");Serial.print(_onEvents[i]->topic);Serial.print("\"??: ");
 			if (_onEvents[i]->hasLevelWildcard)
-				found = _onEvents[i]->topicMatch(topic);
+				found = _onEvents[i]->topicMatch(topic)?_onEvents[i]:NULL;
 			else if (_onEvents[i]->hasHash)
-				found = (0 == strncmp(topic, _onEvents[i]->topic, _onEvents[i]->hasHash - 1));
+				found = (0 == strncmp(topic, _onEvents[i]->topic, _onEvents[i]->hasHash - 1))?_onEvents[i]:NULL;
 			else
-				found = (0 == strcmp(topic, _onEvents[i]->topic));
+				found = (0 == strcmp(topic, _onEvents[i]->topic))?_onEvents[i]:NULL;
 //			Serial.println(found);
 			if (!found)
 				i++;
 			}
 	}
+#endif
 	if (found) {
 #if defined(QUEUE_CALLBACKS)
 //	_pendingCallbacks.push_back(new PendingCallbackItem(topic, payload, payloadLen, _onEvents[i]->callback));
-	PendingCallbackItem* pendingCallback = new PendingCallbackItem(topic, payload, payloadLen, _onEvents[i]->callback);
+	PendingCallbackItem* pendingCallback = new PendingCallbackItem(topic, payload, payloadLen, found->callback);
 	if (_lastPendingCallback)
 		_lastPendingCallback->_next = pendingCallback;
 	else
 		_firstPendingCallback = pendingCallback;
 	_lastPendingCallback = pendingCallback;
 #else
-	if (_onEvents[i]->callback) {
-		_onEvents[i]->callback(topic, payload, payloadLen);
+	if (found->callback) {
+		found->callback(topic, payload, payloadLen);
 	}	
 #endif
 	}
@@ -379,6 +407,7 @@ int i;
 
 void ESPPubSubClient::on(char* topic, MQTT_CALLBACK_SIGNATURE, uint8_t qos) {
 onEventItem *onEvent = new onEventItem(topic, callback, qos);
+	
 	_onEvents.push_back(onEvent);
 	if (STATE_MQTT_LOOP == getState())
 		PubSubClient::subscribe(onEvent->topic, onEvent->qos);
