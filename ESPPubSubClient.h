@@ -20,19 +20,20 @@ class PendingCallbackItem;
 class WaitingPublishItem;
 
 
-class ESPPubSubClient : public BasicStatemachine, public PubSubClient {
+class ESPPubSubClient : public PubSubClient {
   public:
 	ESPPubSubClient(char *domain, uint16_t port = 1883);
 	ESPPubSubClient(uint8_t *ipaddr, uint16_t port = 1883);
 //	PubSubClient* getClient();
 //	bool connect();
 //	bool connected();
+	void setState(int16_t stateNb);
 	void setConnect(const char* id);
 	void setConnect(const char* id, const char* user, const char* pass);
 	void setConnect(const char* id, const char* willTopic, uint8_t willQos, boolean willRetain, const char* willMessage);
 	void setConnect(const char* id, const char* user, const char* pass, const char* willTopic, uint8_t willQos, boolean willRetain, const char* willMessage);
 	void setConnect(const char* id, const char* user, const char* pass, const char* willTopic, uint8_t willQos, boolean willRetain, const char* willMessage, boolean cleanSession);
-	void onEnter(int16_t currentStateNb, int16_t oldStateNb); 
+//	void onEnter(int16_t currentStateNb, int16_t oldStateNb); 
 	void on(char* topic, MQTT_CALLBACK_SIGNATURE, uint8_t qos = 0);
 	boolean publish_waitConnected(const char* topic, const char* payload);
 	boolean publish_waitConnected(const char* topic, const char* payload, boolean retained);
@@ -45,6 +46,8 @@ class ESPPubSubClient : public BasicStatemachine, public PubSubClient {
 	char* _clientID = NULL;
 //	PubSubClient *_client = NULL;
 	WiFiClient _wiFiClient;
+	int16_t _stateNb = 0;
+	uint32_t _stateStartTime = 0;
 	bool _firstRetry = false;
 	int _subscribed = 0;
 	char* _connect_id = NULL;
@@ -124,12 +127,13 @@ public:
 };
 #endif
 
+#define STATE_MQTT_NONE         0
 #define STATE_MQTT_RECONNECT 	1
 #define STATE_MQTT_RESUBSCRIBE  2
 #define STATE_MQTT_LOOP		 	3
 ESPPubSubClient::ESPPubSubClient (char* domain, uint16_t port) :PubSubClient(domain, port, _wiFiClient) {
 //	_client = new PubSubClient(domain, port);
-	StatemachineLooper.add(this);
+//	StatemachineLooper.add(this);
 #if defined(QUEUE_CALLBACKS1)
 	PendingCallbackItem dummy("", NULL, 0, NULL);
 	_pendingCallbacks.push_back(&dummy);
@@ -139,7 +143,7 @@ ESPPubSubClient::ESPPubSubClient (char* domain, uint16_t port) :PubSubClient(dom
 
 ESPPubSubClient::ESPPubSubClient(uint8_t* ipaddr, uint16_t port) :PubSubClient(ipaddr, port, _wiFiClient) {
 //	_client = new PubSubClient(ipaddr, port, *(new WiFiClient));
-	StatemachineLooper.add(this);
+//	StatemachineLooper.add(this);
 #if defined(QUEUE_CALLBACKS1)
 	PendingCallbackItem dummy("", NULL, 0, NULL);
 	_pendingCallbacks.push_back(&dummy);
@@ -187,21 +191,29 @@ class WaitingPublishItem {
 #endif
 
 
-void ESPPubSubClient::onEnter(int16_t currentStateNb, int16_t oldStateNb) {
-	if (STATE_INIT_NONE == currentStateNb) {
+//void ESPPubSubClient::onEnter(int16_t currentStateNb, int16_t oldStateNb) {
+void ESPPubSubClient::setState(int16_t newState) {
+	if (STATE_MQTT_NONE == newState) {
+		for(int i = 0;i < _onEvents.size();i++)
+			_onEvents[i]->subscribed = false;
 		onEventItem* onEvent = _firstOnEvent;
 		while(onEvent) {
 			onEvent->subscribed = false;
 			onEvent = onEvent->_next;
 		}
-	} else if (STATE_MQTT_RECONNECT == currentStateNb)
+	} else if (STATE_MQTT_RECONNECT == newState)
 		_firstRetry = true;
-	else if (STATE_MQTT_RESUBSCRIBE == currentStateNb) {
+	else if (STATE_MQTT_RESUBSCRIBE == newState) {
 		_subscribed = 0;
 		_subsciptionPending = _firstOnEvent;
 	}
+	_stateNb = newState;
+	_stateStartTime = millis();
 }
-void ESPPubSubClient::runState(int16_t stateNb) {
+
+
+//void ESPPubSubClient::runState(int16_t stateNb) {
+void ESPPubSubClient::loop() {
 int wifiStatus = WiFi.status();	
 PendingCallbackItem *callBackItem;
 #if defined(QUEUE_CALLBACKS)
@@ -219,14 +231,15 @@ PendingCallbackItem *callBackItem;
 		yield();
 	}
 #endif
-	if ((STATE_INIT_NONE != stateNb) && (WL_CONNECTED != wifiStatus)) {
+	if ((STATE_INIT_NONE != _stateNb) && (WL_CONNECTED != wifiStatus)) {
 		setState(STATE_INIT_NONE);
 		Serial.println("Reset MQTT: WiFi lost!?");
 		return;
 	}
 
-	switch (stateNb) {
+	switch (_stateNb) {
 		case STATE_INIT_NONE:
+//			Serial.println("State None!");
 			if (WL_CONNECTED == wifiStatus) {
 				setCallback([this](char* topic, byte* payload, unsigned int length) 
 						{this->receivedCallback(topic, payload, length);});
@@ -236,7 +249,7 @@ PendingCallbackItem *callBackItem;
 		case STATE_MQTT_RECONNECT:
 //			if (connected())
 //				setState(STATE_MQTT_LOOP);
-			if (_firstRetry || (getStateTime() > 5000)) {
+			if (_firstRetry || (millis() - _stateStartTime > 5000)) {
 				const char *s = _clientID;
 				String clientIdStr;
 				if (NULL == s) {
@@ -251,7 +264,7 @@ PendingCallbackItem *callBackItem;
 				Serial.print("...");
 				// Create a random client ID
 				// Attempt to connect
-				if (connect(s, _connect_user, _connect_pass, _connect_willTopic, _connect_willQos, 
+				if (PubSubClient::connect(s, _connect_user, _connect_pass, _connect_willTopic, _connect_willQos, 
 							_connect_willRetain, _connect_willMessage, _connect_cleanSession)) {
 					setState(STATE_MQTT_RESUBSCRIBE);
 					Serial.println("connected");
@@ -261,7 +274,7 @@ PendingCallbackItem *callBackItem;
 					Serial.print("failed, rc=");
 					Serial.print(PubSubClient::state());
 					Serial.println(" try again in 5 seconds");
-					resetStateTime();
+					_stateStartTime = millis();
 				}
 			}
 			break;
@@ -409,7 +422,7 @@ void ESPPubSubClient::on(char* topic, MQTT_CALLBACK_SIGNATURE, uint8_t qos) {
 onEventItem *onEvent = new onEventItem(topic, callback, qos);
 	
 	_onEvents.push_back(onEvent);
-	if (STATE_MQTT_LOOP == getState())
+	if (STATE_MQTT_LOOP == _stateNb)
 		PubSubClient::subscribe(onEvent->topic, onEvent->qos);
 }
 
@@ -478,10 +491,6 @@ boolean ESPPubSubClient::publish_waitConnected(const char* topic, const uint8_t 
 #else
 	return PubSubClient::publish(topic, payload, plength, retained);
 #endif	
-}
-
-void ESPPubSubClient::loop() {
-	run();
 }
 
 
