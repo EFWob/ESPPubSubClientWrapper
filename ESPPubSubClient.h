@@ -58,11 +58,15 @@ class ESPPubSubClient : public BasicStatemachine, public PubSubClient {
 	std::vector<onEventItem *> _onEvents ;              
 #if defined(QUEUE_CALLBACKS)	
 //	std::deque<PendingCallbackItem *>  _pendingCallbacks;
-	std::vector<PendingCallbackItem *> _pendingCallbacks;
+//	std::vector<PendingCallbackItem *> _pendingCallbacks;
+	PendingCallbackItem* _firstPendingCallback = NULL;
+	PendingCallbackItem* _lastPendingCallback = NULL;
 #endif	
 #if defined(PUBLISH_WAITCONNECTED)
 //	std::deque<WaitingPublishItem *>  _waitingPublishs;
-	std::vector<WaitingPublishItem *>  _waitingPublishs;
+//	std::vector<WaitingPublishItem *>  _waitingPublishs;
+	WaitingPublishItem* _firstWaitingPublish = NULL;
+	WaitingPublishItem* _lastWaitingPublish = NULL;
 	
 #endif
 };
@@ -109,6 +113,8 @@ public:
 	uint8_t* _payload;
 	unsigned int _payloadLen;
 	MQTT_CALLBACK_SIGNATURE;
+	PendingCallbackItem* _next = NULL;
+	friend class ESPPubSubClient;
 };
 #endif
 
@@ -170,6 +176,7 @@ class WaitingPublishItem {
 		uint8_t* _payload;
 		unsigned int _plength;
 		boolean _retained;
+		WaitingPublishItem* _next = NULL;
 };
 #endif
 
@@ -182,14 +189,18 @@ void ESPPubSubClient::onEnter(int16_t currentStateNb, int16_t oldStateNb) {
 }
 void ESPPubSubClient::runState(int16_t stateNb) {
 int wifiStatus = WiFi.status();	
+PendingCallbackItem *callBackItem;
 #if defined(QUEUE_CALLBACKS)
-	while (_pendingCallbacks.size() > 0) {
-		PendingCallbackItem *callBackItem = _pendingCallbacks[0];
+//	while (_pendingCallbacks.size() > 0) {
+//		callBackItem = _pendingCallbacks[0];
 //		_pendingCallbacks.pop_front();
-		_pendingCallbacks.erase(_pendingCallbacks.begin());
+//		_pendingCallbacks.erase(_pendingCallbacks.begin());
 //		publish("Garage/delayedCallback", callBackItem->_topic);
+	while (callBackItem = _firstPendingCallback) {
 		if (callBackItem->callback)
 			callBackItem->callback(callBackItem->_topic, callBackItem->_payload, callBackItem->_payloadLen);
+		if (NULL == (_firstPendingCallback = callBackItem->_next))
+			_lastPendingCallback = NULL;
 		delete callBackItem;
 		yield();
 	}
@@ -255,13 +266,17 @@ int wifiStatus = WiFi.status();
 				setState(STATE_INIT_NONE);
 				Serial.println("Leaving MQTT-Loop!");
 			} else {
-#if defined(PUBLISH_WAITCONNECTED)				
-				if (_waitingPublishs.size() > 0) {
-					WaitingPublishItem *publishItem = _waitingPublishs[0];
+#if defined(PUBLISH_WAITCONNECTED)		
+				WaitingPublishItem* publishItem;
+//				if (_waitingPublishs.size() > 0) {
+//					WaitingPublishItem *publishItem = _waitingPublishs[0];
 //					_waitingPublishs.pop_front();
-					_waitingPublishs.erase(_waitingPublishs.begin());
+//					_waitingPublishs.erase(_waitingPublishs.begin());
+				if (publishItem = _firstWaitingPublish) {
 					PubSubClient::publish(publishItem->_topic, publishItem->_payload, 
 							publishItem->_plength, publishItem->_retained);
+					if (NULL == (_firstWaitingPublish = publishItem->_next))
+						_lastWaitingPublish = NULL;
 					delete publishItem;
 				}
 #endif
@@ -347,7 +362,13 @@ int i;
 	}
 	if (found) {
 #if defined(QUEUE_CALLBACKS)
-	_pendingCallbacks.push_back(new PendingCallbackItem(topic, payload, payloadLen, _onEvents[i]->callback));
+//	_pendingCallbacks.push_back(new PendingCallbackItem(topic, payload, payloadLen, _onEvents[i]->callback));
+	PendingCallbackItem* pendingCallback = new PendingCallbackItem(topic, payload, payloadLen, _onEvents[i]->callback);
+	if (_lastPendingCallback)
+		_lastPendingCallback->_next = pendingCallback;
+	else
+		_firstPendingCallback = pendingCallback;
+	_lastPendingCallback = pendingCallback;
 #else
 	if (_onEvents[i]->callback) {
 		_onEvents[i]->callback(topic, payload, payloadLen);
@@ -416,7 +437,13 @@ boolean ESPPubSubClient::publish_waitConnected(const char* topic, const uint8_t 
 	if (connected()) {
 		return PubSubClient::publish(topic, payload, plength, retained);
 	} else {
-		_waitingPublishs.push_back(new WaitingPublishItem(topic, payload, plength, retained));
+		WaitingPublishItem* publishItem = new WaitingPublishItem(topic, payload, plength, retained);
+		if (NULL == _firstWaitingPublish)
+			_firstWaitingPublish = publishItem;
+		else
+			_lastWaitingPublish->_next = publishItem;
+		_lastWaitingPublish = publishItem;
+//		_waitingPublishs.push_back(new WaitingPublishItem(topic, payload, plength, retained));
 		return true;
 	}
 #else
