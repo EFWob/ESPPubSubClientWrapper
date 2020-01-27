@@ -3,18 +3,16 @@
 #include <BasicStatemachine.h>
 #include <PubSubClient.h>
 //#include <deque>
-#include <vector>
-#if defined(ESP8266)
-#include <ESP8266WiFi.h>
-//#include <ESP8266WebServer.h>
-#endif
+//#include <vector>
+
 #define QUEUE_CALLBACKS
 #define PUBLISH_WAITCONNECTED
-#if defined(ESP32)
-#include <vector>
+#if defined(ESP8266)
+#include <ESP8266WiFi.h>
+#else
 #include <WiFi.h>
-//#include <WebServer.h>
 #endif
+
 class onEventItem;
 class PendingCallbackItem;
 class WaitingPublishItem;
@@ -58,7 +56,7 @@ class ESPPubSubClientWrapper : public PubSubClient {
 	bool _connect_willRetain = false;
 	char* _connect_willMessage = NULL;
 	bool _connect_cleanSession = true;
-	std::vector<onEventItem *> _onEvents ;              
+//	std::vector<onEventItem *> _onEvents ;              
 	onEventItem* _firstOnEvent = NULL;
 	onEventItem* _lastOnEvent = NULL;
 	onEventItem* _subsciptionPending = NULL;
@@ -132,34 +130,11 @@ public:
 #define STATE_MQTT_RESUBSCRIBE  2
 #define STATE_MQTT_LOOP		 	3
 ESPPubSubClientWrapper::ESPPubSubClientWrapper (char* domain, uint16_t port) :PubSubClient(domain, port, _wiFiClient) {
-//	_client = new PubSubClient(domain, port);
-//	StatemachineLooper.add(this);
-#if defined(QUEUE_CALLBACKS1)
-	PendingCallbackItem dummy("", NULL, 0, NULL);
-	_pendingCallbacks.push_back(&dummy);
-	_pendingCallbacks.pop_front();
-#endif
 };
 
 ESPPubSubClientWrapper::ESPPubSubClientWrapper(uint8_t* ipaddr, uint16_t port) :PubSubClient(ipaddr, port, _wiFiClient) {
-//	_client = new PubSubClient(ipaddr, port, *(new WiFiClient));
-//	StatemachineLooper.add(this);
-#if defined(QUEUE_CALLBACKS1)
-	PendingCallbackItem dummy("", NULL, 0, NULL);
-	_pendingCallbacks.push_back(&dummy);
-	_pendingCallbacks.pop_front();
-#endif
 };
 
-/*
-PubSubClient* ESPPubSubClientWrapper::getClient() {
-	return _client;
-}
-
-bool ESPPubSubClientWrapper::connected() {
-	return _client->connected();
-}
-*/
 
 #if defined(PUBLISH_WAITCONNECTED)
 class WaitingPublishItem {
@@ -194,8 +169,8 @@ class WaitingPublishItem {
 //void ESPPubSubClientWrapper::onEnter(int16_t currentStateNb, int16_t oldStateNb) {
 void ESPPubSubClientWrapper::setState(int16_t newState) {
 	if (STATE_MQTT_NONE == newState) {
-		for(int i = 0;i < _onEvents.size();i++)
-			_onEvents[i]->subscribed = false;
+//		for(int i = 0;i < _onEvents.size();i++)
+//			_onEvents[i]->subscribed = false;
 		onEventItem* onEvent = _firstOnEvent;
 		while(onEvent) {
 			onEvent->subscribed = false;
@@ -279,7 +254,7 @@ PendingCallbackItem *callBackItem;
 			}
 			break;
 		case STATE_MQTT_RESUBSCRIBE:
-#ifdef NEWSUBSCRIBE
+#ifndef NEWSUBSCRIBE
 				if (NULL == _subsciptionPending)
 					setState(STATE_MQTT_LOOP);
 				else {
@@ -380,10 +355,21 @@ void ESPPubSubClientWrapper::setConnect(const char *id, const char *user, const 
 
 void ESPPubSubClientWrapper::receivedCallback(char* topic, uint8_t* payload, unsigned int payloadLen) {
 onEventItem* found = NULL;
+onEventItem* onEvent;
 int i;
 //	Serial.print("Checking callbacks! Topic: ");
 //	Serial.println(topic);
-#if defined(NEWSUBSCRIBE)
+#if !defined(NEWSUBSCRIBE)
+	onEvent = _firstOnEvent;
+	for(onEvent = _firstOnEvent;(NULL != onEvent) && (NULL == found);onEvent = onEvent->_next) 
+		if (onEvent->subscribed) {
+			if (onEvent->hasLevelWildcard)
+				found = onEvent->topicMatch(topic)?onEvent:NULL;
+			else if (onEvent->hasHash)
+				found = (0 == strncmp(topic, onEvent->topic, onEvent->hasHash - 1))?onEvent:NULL;
+			else
+				found = (0 == strcmp(topic, onEvent->topic))?onEvent:NULL;
+		}
 #else
 	for (i = 0; (i < _onEvents.size()) && !found;) {
 		if (_onEvents[i]->subscribed)
@@ -420,8 +406,13 @@ int i;
 
 void ESPPubSubClientWrapper::on(char* topic, MQTT_CALLBACK_SIGNATURE, uint8_t qos) {
 onEventItem *onEvent = new onEventItem(topic, callback, qos);
-	
-	_onEvents.push_back(onEvent);
+	if (NULL == _firstOnEvent)
+		_firstOnEvent = onEvent;
+	else
+		_lastOnEvent->_next = onEvent;
+	_lastOnEvent = onEvent;
+	//Verkettung sollte passen. _onEvents wird hier nicht mehr benötigt	
+//	_onEvents.push_back(onEvent);
 	if (STATE_MQTT_LOOP == _stateNb)
 		PubSubClient::subscribe(onEvent->topic, onEvent->qos);
 }
