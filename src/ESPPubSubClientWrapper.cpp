@@ -161,8 +161,6 @@ PendingCallbackItem *callBackItem;
 					if (_cbConnect) 
 						_cbConnect(_discCount);
 					_discCount++;
-					// Once connected, publish an announcement...
-					// ... and resubscribe
 				} else {
 					bool retry = true;
 					if (_cbConnectFail)
@@ -180,7 +178,6 @@ PendingCallbackItem *callBackItem;
 			}
 			break;
 		case STATE_MQTT_RESUBSCRIBE:
-#ifndef NEWSUBSCRIBE
 				if (NULL == _subsciptionPending)
 					setState(STATE_MQTT_LOOP);
 				else {
@@ -189,16 +186,6 @@ PendingCallbackItem *callBackItem;
 						PubSubClient::subscribe(_subsciptionPending->topic, _subsciptionPending->qos);
 					_subsciptionPending = _subsciptionPending->_next;						
 				}
-#else
-				if (_subscribed >= _onEvents.size())
-					setState(STATE_MQTT_LOOP);
-				else {
-					PubSubClient::loop();
-					_onEvents[_subscribed]->subscribed =
-						PubSubClient::subscribe(_onEvents[_subscribed]->topic, _onEvents[_subscribed]->qos);
-					_subscribed++;
-				}
-#endif
 			break;
 		case STATE_MQTT_LOOP:
 			if (!PubSubClient::loop()) {
@@ -317,9 +304,6 @@ void ESPPubSubClientWrapper::receivedCallback(char* topic, uint8_t* payload, uns
 onEventItem* found = NULL;
 onEventItem* onEvent;
 int i;
-//	Serial.print("Checking callbacks! Topic: ");
-//	Serial.println(topic);
-
 	onEvent = _firstOnEvent;
 	for(onEvent = _firstOnEvent;(NULL != onEvent) && (NULL == found);onEvent = onEvent->_next) 
 		if (onEvent->subscribed) {
