@@ -23,11 +23,11 @@
 */
 
 #include <ESP8266WiFi.h>
-#include <ESPPubSubClient.h>
+#include <ESPPubSubClientWrapper.h>
 
 // Update these with values suitable for your network.
 
-const char* ssid = "..........";
+const char* ssid = "...........";
 const char* password = "..........";
 const char* mqtt_server = "broker.mqtt-dashboard.com";
 

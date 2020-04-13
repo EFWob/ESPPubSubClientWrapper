@@ -22,15 +22,17 @@ const char* mqtt_server = "broker.mqtt-dashboard.com";
 #define DISCONNECT_TOPIC "disconnect"
 
 ESPPubSubClientWrapper client(mqtt_server);
-long lastMsg = 0;
-char msg[50];
-int value = 0;
 
 
 void connectSuccess(uint16_t reConnectCount) {
   Serial.print("Connected to MQTT-Broker!\nThis is connection nb: ");
   Serial.println(reConnectCount + 1);
   lastMsg = millis();
+}
+
+void gotDisconnected(uint16_t disconnectCount) {
+  Serial.print("Got disconnected from MQTT-Broker!\nThis is disconnect nb: ");
+  Serial.println(disconnectCount);
 }
 
 void setup() {
@@ -43,8 +45,9 @@ void setup() {
   WiFi.begin(ssid, password);
   // No need to wait here for a successful connection, this is done via loop()	
   
-  client.onConnect(connectSuccess);
-  client.on(DISCONNECT_TOPIC, [](char* topic, byte* payload, unsigned int length) {client.disconnect();});
+  client.onConnect(connectSuccess)
+	.onDisconnect(gotDisconnected)
+	.on(DISCONNECT_TOPIC, [](char* topic, byte* payload, unsigned int length) {client.disconnect();});
 
 }
 
