@@ -4,7 +4,7 @@
     "description": "A ESP8266/ESP32 specific library for wrapping the functionality of the MQTT PubSubClient-library by knollerary. The aim is to simplify the API for recurring tasks like reconnecting or specific callbacks for specific topics.",
     "repository": {
         "type": "git",
-        "url": "https://github.com/knolleary/pubsubclient.git"
+        "url": "https://github.com/EFWob/ESPPubSubClient.git"
     },
     "version": "0.1",
     "exclude": "tests",
