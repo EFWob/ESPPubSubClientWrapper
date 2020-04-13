@@ -27,7 +27,6 @@ ESPPubSubClientWrapper client(mqtt_server);
 void connectSuccess(uint16_t reConnectCount) {
   Serial.print("Connected to MQTT-Broker!\nThis is connection nb: ");
   Serial.println(reConnectCount + 1);
-  lastMsg = millis();
 }
 
 void gotDisconnected(uint16_t disconnectCount) {
