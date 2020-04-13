@@ -1,85 +1,9 @@
-#ifndef ESPPubSubClientWrapper_h
-#define ESPPubSubClientWrapper_h
-#include <BasicStatemachine.h>
-#include <PubSubClient.h>
-//#include <deque>
-//#include <vector>
-
-#define QUEUE_CALLBACKS
-#define PUBLISH_WAITCONNECTED
-#if defined(ESP8266)
-#include <ESP8266WiFi.h>
-#else
-#include <WiFi.h>
-#endif
-
-class onEventItem;
-class PendingCallbackItem;
-class WaitingPublishItem;
-
-
-class ESPPubSubClientWrapper : public PubSubClient {
-  public:
-	ESPPubSubClientWrapper(char *domain, uint16_t port = 1883);
-	ESPPubSubClientWrapper(uint8_t *ipaddr, uint16_t port = 1883);
-//	PubSubClient* getClient();
-//	bool connect();
-//	bool connected();
-	void setState(int16_t stateNb);
-	void setConnect(const char* id);
-	void setConnect(const char* id, const char* user, const char* pass);
-	void setConnect(const char* id, const char* willTopic, uint8_t willQos, boolean willRetain, const char* willMessage);
-	void setConnect(const char* id, const char* user, const char* pass, const char* willTopic, uint8_t willQos, boolean willRetain, const char* willMessage);
-	void setConnect(const char* id, const char* user, const char* pass, const char* willTopic, uint8_t willQos, boolean willRetain, const char* willMessage, boolean cleanSession);
-//	void onEnter(int16_t currentStateNb, int16_t oldStateNb); 
-	void on(char* topic, MQTT_CALLBACK_SIGNATURE, uint8_t qos = 0);
-	boolean publish_waitConnected(const char* topic, const char* payload);
-	boolean publish_waitConnected(const char* topic, const char* payload, boolean retained);
-	boolean publish_waitConnected(const char* topic, const uint8_t * payload, unsigned int plength);
-	boolean publish_waitConnected(const char* topic, const uint8_t * payload, unsigned int plength, boolean retained);
-	void loop();
-   protected:
-    void receivedCallback(char* topic, byte* payload, unsigned int length); 
-    void runState(int16_t stateNb);
-	char* _clientID = NULL;
-//	PubSubClient *_client = NULL;
-	WiFiClient _wiFiClient;
-	int16_t _stateNb = 0;
-	uint32_t _stateStartTime = 0;
-	bool _firstRetry = false;
-	int _subscribed = 0;
-	char* _connect_id = NULL;
-	char* _connect_user = NULL;
-	char* _connect_pass = NULL;
-	char* _connect_willTopic = NULL;
-	uint8_t _connect_willQos = 0;
-	bool _connect_willRetain = false;
-	char* _connect_willMessage = NULL;
-	bool _connect_cleanSession = true;
-//	std::vector<onEventItem *> _onEvents ;              
-	onEventItem* _firstOnEvent = NULL;
-	onEventItem* _lastOnEvent = NULL;
-	onEventItem* _subsciptionPending = NULL;
-#if defined(QUEUE_CALLBACKS)	
-//	std::deque<PendingCallbackItem *>  _pendingCallbacks;
-//	std::vector<PendingCallbackItem *> _pendingCallbacks;
-	PendingCallbackItem* _firstPendingCallback = NULL;
-	PendingCallbackItem* _lastPendingCallback = NULL;
-
-#endif	
-#if defined(PUBLISH_WAITCONNECTED)
-//	std::deque<WaitingPublishItem *>  _waitingPublishs;
-//	std::vector<WaitingPublishItem *>  _waitingPublishs;
-	WaitingPublishItem* _firstWaitingPublish = NULL;
-	WaitingPublishItem* _lastWaitingPublish = NULL;
-	
-#endif
-};
+#include <ESPPubSubClientWrapper.h>
 
 
 class onEventItem {
 public:
-	onEventItem(char *t, MQTT_CALLBACK_SIGNATURE, uint8_t qos);
+	onEventItem(const char *t, MQTT_CALLBACK_SIGNATURE, uint8_t qos);
 	boolean topicMatch(char *value);
 	char * topic;
 	uint16_t hasHash;
@@ -129,7 +53,8 @@ public:
 #define STATE_MQTT_RECONNECT 	1
 #define STATE_MQTT_RESUBSCRIBE  2
 #define STATE_MQTT_LOOP		 	3
-ESPPubSubClientWrapper::ESPPubSubClientWrapper (char* domain, uint16_t port) :PubSubClient(domain, port, _wiFiClient) {
+#define STATE_MQTT_STOP			4
+ESPPubSubClientWrapper::ESPPubSubClientWrapper (const char* domain, uint16_t port) :PubSubClient(domain, port, _wiFiClient) {
 };
 
 ESPPubSubClientWrapper::ESPPubSubClientWrapper(uint8_t* ipaddr, uint16_t port) :PubSubClient(ipaddr, port, _wiFiClient) {
@@ -166,11 +91,8 @@ class WaitingPublishItem {
 #endif
 
 
-//void ESPPubSubClientWrapper::onEnter(int16_t currentStateNb, int16_t oldStateNb) {
 void ESPPubSubClientWrapper::setState(int16_t newState) {
 	if (STATE_MQTT_NONE == newState) {
-//		for(int i = 0;i < _onEvents.size();i++)
-//			_onEvents[i]->subscribed = false;
 		onEventItem* onEvent = _firstOnEvent;
 		while(onEvent) {
 			onEvent->subscribed = false;
@@ -179,7 +101,7 @@ void ESPPubSubClientWrapper::setState(int16_t newState) {
 	} else if (STATE_MQTT_RECONNECT == newState)
 		_firstRetry = true;
 	else if (STATE_MQTT_RESUBSCRIBE == newState) {
-		_subscribed = 0;
+//		_subscribed = 0;
 		_subsciptionPending = _firstOnEvent;
 	}
 	_stateNb = newState;
@@ -187,16 +109,10 @@ void ESPPubSubClientWrapper::setState(int16_t newState) {
 }
 
 
-//void ESPPubSubClientWrapper::runState(int16_t stateNb) {
-void ESPPubSubClientWrapper::loop() {
+boolean ESPPubSubClientWrapper::loop() {
 int wifiStatus = WiFi.status();	
 PendingCallbackItem *callBackItem;
 #if defined(QUEUE_CALLBACKS)
-//	while (_pendingCallbacks.size() > 0) {
-//		callBackItem = _pendingCallbacks[0];
-//		_pendingCallbacks.pop_front();
-//		_pendingCallbacks.erase(_pendingCallbacks.begin());
-//		publish("Garage/delayedCallback", callBackItem->_topic);
 	while (callBackItem = _firstPendingCallback) {
 		if (callBackItem->callback)
 			callBackItem->callback(callBackItem->_topic, callBackItem->_payload, callBackItem->_payloadLen);
@@ -206,24 +122,23 @@ PendingCallbackItem *callBackItem;
 		yield();
 	}
 #endif
-	if ((STATE_INIT_NONE != _stateNb) && (WL_CONNECTED != wifiStatus)) {
-		setState(STATE_INIT_NONE);
+	if ((STATE_MQTT_NONE != _stateNb) && (STATE_MQTT_STOP != _stateNb) && (WL_CONNECTED != wifiStatus)) {
+		setState(STATE_MQTT_NONE);
 		Serial.println("Reset MQTT: WiFi lost!?");
-		return;
+		return true;
 	}
 
 	switch (_stateNb) {
-		case STATE_INIT_NONE:
+		case STATE_MQTT_NONE:
 //			Serial.println("State None!");
 			if (WL_CONNECTED == wifiStatus) {
-				setCallback([this](char* topic, byte* payload, unsigned int length) 
+				PubSubClient::setCallback([this](char* topic, byte* payload, unsigned int length) 
 						{this->receivedCallback(topic, payload, length);});
 				setState(STATE_MQTT_RECONNECT);
+				_connectFailCount = 0;
 			}
 			break;
 		case STATE_MQTT_RECONNECT:
-//			if (connected())
-//				setState(STATE_MQTT_LOOP);
 			if (_firstRetry || (millis() - _stateStartTime > 5000)) {
 				const char *s = _clientID;
 				String clientIdStr;
@@ -243,13 +158,24 @@ PendingCallbackItem *callBackItem;
 							_connect_willRetain, _connect_willMessage, _connect_cleanSession)) {
 					setState(STATE_MQTT_RESUBSCRIBE);
 					Serial.println("connected");
+					if (_cbConnect) 
+						_cbConnect(_discCount);
+					_discCount++;
 					// Once connected, publish an announcement...
 					// ... and resubscribe
 				} else {
+					bool retry = true;
+					if (_cbConnectFail)
+						retry = _cbConnectFail(++_connectFailCount);
 					Serial.print("failed, rc=");
 					Serial.print(PubSubClient::state());
-					Serial.println(" try again in 5 seconds");
-					_stateStartTime = millis();
+					if (retry) {
+						Serial.println(" try again in 5 seconds");
+						_stateStartTime = millis();
+					} else {
+						Serial.println(" giving up finally!");
+						setState(STATE_MQTT_STOP);
+					}	
 				}
 			}
 			break;
@@ -276,16 +202,18 @@ PendingCallbackItem *callBackItem;
 			break;
 		case STATE_MQTT_LOOP:
 			if (!PubSubClient::loop()) {
-				setState(STATE_INIT_NONE);
+				setState(STATE_MQTT_NONE);
+				if (_cbDisc)
+					_cbDisc(_discCount);
 				Serial.println("Leaving MQTT-Loop!");
 			} else {
 #if defined(PUBLISH_WAITCONNECTED)		
-				WaitingPublishItem* publishItem;
+				WaitingPublishItem* publishItem = _firstWaitingPublish;
 //				if (_waitingPublishs.size() > 0) {
 //					WaitingPublishItem *publishItem = _waitingPublishs[0];
 //					_waitingPublishs.pop_front();
 //					_waitingPublishs.erase(_waitingPublishs.begin());
-				if (publishItem = _firstWaitingPublish) {
+				if (NULL != _firstWaitingPublish) {
 					PubSubClient::publish(publishItem->_topic, publishItem->_payload, 
 							publishItem->_plength, publishItem->_retained);
 					if (NULL == (_firstWaitingPublish = publishItem->_next))
@@ -295,27 +223,58 @@ PendingCallbackItem *callBackItem;
 #endif
 			}
 			break;
+		case STATE_MQTT_STOP:
+			break;
 		}
+	return true;
 };		
 
 
-void ESPPubSubClientWrapper::setConnect(const char *id) {
-    setConnect(id,NULL,NULL,0,0,0,0,1);
+
+ESPPubSubClientWrapper& ESPPubSubClientWrapper::onConnect(CALLBACK_SIGNATURE_VOID_UINT16 callback) {
+	_cbConnect = callback;
+	return *this;
+};
+
+ESPPubSubClientWrapper& ESPPubSubClientWrapper::onDisconnect(CALLBACK_SIGNATURE_VOID_UINT16 callback) {
+	_cbDisc = callback;
+	return *this;
+};
+
+ESPPubSubClientWrapper& ESPPubSubClientWrapper::onConnectFail(CALLBACK_SIGNATURE_BOOL_UINT16 callback) {
+	_cbConnectFail = callback;
+	return *this;
 }
 
-void ESPPubSubClientWrapper::setConnect(const char *id, const char *user, const char *pass) {
-    setConnect(id,user,pass,0,0,0,0,1);
+ESPPubSubClientWrapper& ESPPubSubClientWrapper::setCallback(MQTT_CALLBACK_SIGNATURE) {
+    this->callback = callback;
+    return *this;
+}
+	
+
+
+boolean ESPPubSubClientWrapper::connect(const char *id) {
+    return doSetConnect(id,NULL,NULL,0,0,0,0,1);
 }
 
-void ESPPubSubClientWrapper::setConnect(const char *id, const char* willTopic, uint8_t willQos, boolean willRetain, const char* willMessage) {
-    setConnect(id,NULL,NULL,willTopic,willQos,willRetain,willMessage,1);
+boolean ESPPubSubClientWrapper::connect(const char *id, const char *user, const char *pass) {
+    return doSetConnect(id,user,pass,0,0,0,0,1);
 }
 
-void ESPPubSubClientWrapper::setConnect(const char *id, const char *user, const char *pass, const char* willTopic, uint8_t willQos, boolean willRetain, const char* willMessage) {
-    setConnect(id,user,pass,willTopic,willQos,willRetain,willMessage,1);
+boolean ESPPubSubClientWrapper::connect(const char *id, const char* willTopic, uint8_t willQos, boolean willRetain, const char* willMessage) {
+    return doSetConnect(id,NULL,NULL,willTopic,willQos,willRetain,willMessage,1);
 }
 
-void ESPPubSubClientWrapper::setConnect(const char *id, const char *user, const char *pass, const char* willTopic, 
+boolean ESPPubSubClientWrapper::connect(const char *id, const char *user, const char *pass, const char* willTopic, uint8_t willQos, boolean willRetain, const char* willMessage) {
+    return doSetConnect(id,user,pass,willTopic,willQos,willRetain,willMessage,1);
+}
+
+boolean ESPPubSubClientWrapper::connect(const char *id, const char *user, const char *pass, const char* willTopic, 
+		uint8_t willQos, boolean willRetain, const char* willMessage, boolean cleanSession) {
+		return doSetConnect(id,user,pass,willTopic,willQos,willRetain,willMessage, cleanSession);
+	}
+
+boolean ESPPubSubClientWrapper::doSetConnect(const char *id, const char *user, const char *pass, const char* willTopic, 
 		uint8_t willQos, boolean willRetain, const char* willMessage, boolean cleanSession) {
 	if (_connect_id) 
 		free(_connect_id);
@@ -350,6 +309,7 @@ void ESPPubSubClientWrapper::setConnect(const char *id, const char *user, const 
 	_connect_willQos = willQos;
 	_connect_willRetain = willRetain;
 	_connect_cleanSession = cleanSession;
+	return true;
 	}		
 	
 
@@ -359,7 +319,7 @@ onEventItem* onEvent;
 int i;
 //	Serial.print("Checking callbacks! Topic: ");
 //	Serial.println(topic);
-#if !defined(NEWSUBSCRIBE)
+
 	onEvent = _firstOnEvent;
 	for(onEvent = _firstOnEvent;(NULL != onEvent) && (NULL == found);onEvent = onEvent->_next) 
 		if (onEvent->subscribed) {
@@ -370,41 +330,33 @@ int i;
 			else
 				found = (0 == strcmp(topic, onEvent->topic))?onEvent:NULL;
 		}
-#else
-	for (i = 0; (i < _onEvents.size()) && !found;) {
-		if (_onEvents[i]->subscribed)
-			{
-//			Serial.print("...match with: \"");Serial.print(_onEvents[i]->topic);Serial.print("\"??: ");
-			if (_onEvents[i]->hasLevelWildcard)
-				found = _onEvents[i]->topicMatch(topic)?_onEvents[i]:NULL;
-			else if (_onEvents[i]->hasHash)
-				found = (0 == strncmp(topic, _onEvents[i]->topic, _onEvents[i]->hasHash - 1))?_onEvents[i]:NULL;
-			else
-				found = (0 == strcmp(topic, _onEvents[i]->topic))?_onEvents[i]:NULL;
-//			Serial.println(found);
-			if (!found)
-				i++;
-			}
-	}
-#endif
+
 	if (found) {
+		MQTT_CALLBACK_SIGNATURE = found->callback;
+		if (NULL == callback)
+			callback = this->callback;
+		if (callback) {
 #if defined(QUEUE_CALLBACKS)
 //	_pendingCallbacks.push_back(new PendingCallbackItem(topic, payload, payloadLen, _onEvents[i]->callback));
-	PendingCallbackItem* pendingCallback = new PendingCallbackItem(topic, payload, payloadLen, found->callback);
-	if (_lastPendingCallback)
-		_lastPendingCallback->_next = pendingCallback;
-	else
-		_firstPendingCallback = pendingCallback;
-	_lastPendingCallback = pendingCallback;
+			PendingCallbackItem* pendingCallback = new PendingCallbackItem(topic, payload, payloadLen, callback);
+			if (_lastPendingCallback)
+				_lastPendingCallback->_next = pendingCallback;
+			else
+				_firstPendingCallback = pendingCallback;
+			_lastPendingCallback = pendingCallback;
 #else
-	if (found->callback) {
-		found->callback(topic, payload, payloadLen);
-	}	
+			callback(topic, payload, payloadLen);	
 #endif
+		}
 	}
 }
 
-void ESPPubSubClientWrapper::on(char* topic, MQTT_CALLBACK_SIGNATURE, uint8_t qos) {
+boolean ESPPubSubClientWrapper::subscribe(const char* topic, uint8_t qos) {
+	this->on(topic, NULL, qos);
+	return true;
+}
+
+ESPPubSubClientWrapper& ESPPubSubClientWrapper::on(const char* topic, MQTT_CALLBACK_SIGNATURE, uint8_t qos) {
 onEventItem *onEvent = new onEventItem(topic, callback, qos);
 	if (NULL == _firstOnEvent)
 		_firstOnEvent = onEvent;
@@ -415,10 +367,11 @@ onEventItem *onEvent = new onEventItem(topic, callback, qos);
 //	_onEvents.push_back(onEvent);
 	if (STATE_MQTT_LOOP == _stateNb)
 		PubSubClient::subscribe(onEvent->topic, onEvent->qos);
+	return *this;
 }
 
 
-onEventItem::onEventItem(char *t, MQTT_CALLBACK_SIGNATURE, uint8_t qos) {
+onEventItem::onEventItem(const char *t, MQTT_CALLBACK_SIGNATURE, uint8_t qos) {
 	if (topic = strdup(t)) {
 		char *hashPos = strchr(topic, '#');
 		if (hashPos != NULL) {
@@ -483,51 +436,3 @@ boolean ESPPubSubClientWrapper::publish_waitConnected(const char* topic, const u
 	return PubSubClient::publish(topic, payload, plength, retained);
 #endif	
 }
-
-
-/*
-onEventStruct *onEventStruct::getOnEvent(const char *topic) {
-onEventStruct *ret = this;
-		while (ret) {
-			Serial.print("Try match: ");Serial.print(topic);Serial.print(" with: ");Serial.println(ret->topic);
-			if (ret->hasLevelWildcard) {
-				if (ret->topicMatch((char *)topic))
-					return ret;
-			}
-			else if (ret->hasHash){
-				if (strstr(topic, ret->topic) == topic)
-					return ret;
-			}	
-			else if (0 == strcmp(topic, ret->topic))
-				return ret;
-			Serial.println("Match not found. May be next!?");
-			ret = ret->next;
-		}
-		return ret;		
-}
-*/
-	
-
-class ESPPubSubClient : public ESPPubSubClientWrapper, public BasicStatemachine {
-  public:
-	ESPPubSubClient(char *domain, uint16_t port = 1883);
-	ESPPubSubClient(uint8_t *ipaddr, uint16_t port = 1883);
-  protected:
-    void runState(int16_t stateNb);
-};
-	
-
-ESPPubSubClient::ESPPubSubClient(char *domain, uint16_t port) : ESPPubSubClientWrapper(domain, port) {
-	StatemachineLooper.add(this);
-}
-
-ESPPubSubClient::ESPPubSubClient(uint8_t *ipaddr, uint16_t port): ESPPubSubClientWrapper(ipaddr, port) {
-	StatemachineLooper.add(this);
-}	
-	
-void ESPPubSubClient::runState(int16_t stateNb) {
-	loop();
-}	
-
-
-#endif
