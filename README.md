@@ -38,8 +38,8 @@ The main additions to the base class are:
 
 The following is a minimalistic example (for ESP8266)
 
-`
-#include <ESP8266WiFi.h>
+
+`#include <ESP8266WiFi.h>
 #include <ESPPubSubClientWrapper.h>
 
 const char* ssid = "..........";				// Put your WiFi credentials here
@@ -67,8 +67,8 @@ void setup() {
 
 void loop() {
   client.loop();
-}
-`
+}`
+
 
 ## Limitations
 
