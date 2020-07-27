@@ -27,11 +27,13 @@ The main additions to the base class are:
 	`ESPPubSubClientWrapper& on(const char* topic, MQTT_CALLBACK_SIGNATURE, uint8_t qos = 0);` however the return value is 
 	a reference to the calling object thus allowing to chain multiple calls to `on()`.
  * The topics used for calling `on()` can include the MQTT-Wildcards `#` and `+`.
+ * There is no fixed limit on subscriptions that can be made using `on()`. In practice the number is limited by available 
+   memory (RAM), as the topic for each subscriptions has to be stored as RAM copy. 
  * It is possible that an incoming topic matches to more than one callback. Consider as example `client.on("test/#", 
 	callback1);client.on("#", callback2);`. The second topic subscription matches also topics that match the first call 
 	to `on()`. In that case not all matching callbacks fire but the order of subscription is relevant. In the given example, 
     each incoming message that matches `"test/#"` will fire `callback1()` while all other topics are matched to `callback2()`.
- * It is not necessary to call any 'connect()' method. In that case connection will be done with random client-id.
+ * It is not necessary to call any `connect()` method. In that case connection will be done with random client-id.
  * A call to any `connect()` method will not actually connect but just set the parameters for later connection attempt.
  * The connection attempt will be made during the `loop()` method once the WiFi-connection is established (i. e. no need
    to wait for the WiFi connection to be established before connecting the MQTT-client).
