@@ -15,8 +15,6 @@ void callbackHello(char* topic, byte* payload, unsigned int length) {
 
 void callbackWorld(char* topic, byte* payload, unsigned int length) {
   Serial.println("Message ""world"" received");
-  if ((length == 5) && (0 == strncmp((const char *)payload,"hello", 5))) 
-    client.publish("world", "is listening to your hello!"); 
 }
 
 void setup() {
