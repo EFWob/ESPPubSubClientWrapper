@@ -124,7 +124,7 @@ PendingCallbackItem *callBackItem;
 #endif
 	if ((STATE_MQTT_NONE != _stateNb) && (STATE_MQTT_STOP != _stateNb) && (WL_CONNECTED != wifiStatus)) {
 		setState(STATE_MQTT_NONE);
-		Serial.println("Reset MQTT: WiFi lost!?");
+//		Serial.println("Reset MQTT: WiFi lost!?");
 		return true;
 	}
 
@@ -149,15 +149,15 @@ PendingCallbackItem *callBackItem;
 					s = clientIdStr.c_str();
 				}
 				_firstRetry = false;
-				Serial.print("Attempting MQTT connection...");
-				Serial.print(s);
-				Serial.print("...");
+//				Serial.print("Attempting MQTT connection...");
+//				Serial.print(s);
+//				Serial.print("...");
 				// Create a random client ID
 				// Attempt to connect
 				if (PubSubClient::connect(s, _connect_user, _connect_pass, _connect_willTopic, _connect_willQos, 
 							_connect_willRetain, _connect_willMessage, _connect_cleanSession)) {
 					setState(STATE_MQTT_RESUBSCRIBE);
-					Serial.println("connected");
+//					Serial.println("connected");
 					if (_cbConnect) 
 						_cbConnect(_discCount);
 					_discCount++;
@@ -165,13 +165,13 @@ PendingCallbackItem *callBackItem;
 					bool retry = true;
 					if (_cbConnectFail)
 						retry = _cbConnectFail(++_connectFailCount);
-					Serial.print("failed, rc=");
-					Serial.print(PubSubClient::state());
+//					Serial.print("failed, rc=");
+//					Serial.print(PubSubClient::state());
 					if (retry) {
-						Serial.println(" try again in 5 seconds");
+//						Serial.println(" try again in 5 seconds");
 						_stateStartTime = millis();
 					} else {
-						Serial.println(" giving up finally!");
+//						Serial.println(" giving up finally!");
 						setState(STATE_MQTT_STOP);
 					}	
 				}
@@ -192,7 +192,7 @@ PendingCallbackItem *callBackItem;
 				setState(STATE_MQTT_NONE);
 				if (_cbDisc)
 					_cbDisc(_discCount);
-				Serial.println("Leaving MQTT-Loop!");
+//				Serial.println("Leaving MQTT-Loop!");
 			} else {
 #if defined(PUBLISH_WAITCONNECTED)		
 				WaitingPublishItem* publishItem = _firstWaitingPublish;
@@ -350,9 +350,38 @@ onEventItem *onEvent = new onEventItem(topic, callback, qos);
 	//Verkettung sollte passen. _onEvents wird hier nicht mehr benötigt	
 //	_onEvents.push_back(onEvent);
 	if (STATE_MQTT_LOOP == _stateNb)
-		PubSubClient::subscribe(onEvent->topic, onEvent->qos);
+		onEvent->subscribed = PubSubClient::subscribe(onEvent->topic, onEvent->qos);
 	return *this;
 }
+
+
+boolean ESPPubSubClientWrapper::unsubscribe(const char* topic) {
+boolean ret = false;
+onEventItem *onEvent = _firstOnEvent;
+onEventItem *prev = NULL;
+	while (!ret && (NULL != onEvent))
+		if (!(ret = (0 == strcmp(topic, onEvent->topic)))) {
+			prev = onEvent;
+			onEvent = onEvent->_next;
+		}
+	if (onEvent) {
+		if (prev)
+			prev->_next = onEvent->_next;
+		else
+			_firstOnEvent = onEvent->_next;
+		if (!onEvent->_next)
+			_lastOnEvent = prev;
+		if (this->connected())
+			ret = PubSubClient::unsubscribe(onEvent->topic);
+		if (onEvent->topic)
+			free(onEvent->topic);
+		delete onEvent;
+		
+	}
+	return ret;
+}
+
+
 
 
 onEventItem::onEventItem(const char *t, MQTT_CALLBACK_SIGNATURE, uint8_t qos) {

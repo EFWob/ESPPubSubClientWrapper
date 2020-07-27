@@ -37,15 +37,23 @@ class ESPPubSubClientWrapper : public PubSubClient {
 	/*	
 		Compatibility function. Each topic subscribed to by this function will use the "global" callback set by the
 		setCallback() method.
-		Better use on() for mapping specific callbacks to specific callbacks.
+		Better use on() for mapping specific topics to specific callbacks.
 		Method can be called even if client is not (yet) connected, i. e. during setup() in Arduino. 
 		Once the connection is (re-)established, all outstanding subscriptions will be resolved.
 	*/
 	boolean subscribe(const char* topic, uint8_t qos = 0);
+
+	/* 
+		unsubscribe() is used both for topics subscribed to by using the method subscribe() or the method on() 
+	*/
+	boolean unsubscribe(const char* topic);	
+	
+	
 	/*
 		Compatibility function. Sets the "global" callback for each topic subscribed to by the subscribe()-method.
 		Better use on() for mapping specific callbacks to to specific callbacks.
 	*/
+	
 	ESPPubSubClientWrapper& setCallback(MQTT_CALLBACK_SIGNATURE);
 	
 	/*
