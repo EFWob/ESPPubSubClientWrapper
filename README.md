@@ -43,7 +43,7 @@ The main additions to the base class are:
 	* `ESPPubSubClientWrapper& onConnect(std::function<void(uint16_t)> connectCallback)`: `void connectCallback(uint16_t count)`
 		is called upon successful connect. Parameter `count` is zero for first successful connection and increased for each
 		reconnect.
-	* `ESPPubSubClientWrapper& onConnect(std::function<void(uint16_t)> disconnectCallback)`: 
+	* `ESPPubSubClientWrapper& onDisconnect(std::function<void(uint16_t)> disconnectCallback)`: 
 		`void disconnectCallback(uint16_t count)` is called if connection to MQTT server is lost. Parameter `count` is One on first
         disconnect and will be increased for each further disconnect.
     *  `ESPPubSubClientWrapper& onConnectFail(std::function<bool(uint16_t)> connectFailCallback)`:
