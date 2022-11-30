@@ -51,21 +51,21 @@ The main additions to the base class are:
 
 By default, you can use only one central callback to react on incoming messages using the `subscribe()` method. If you 
 subscribe to multiple topics, you have to check each incoming topic and select the appropriate reaction. This is 
-simpilfied with the new `on()` methods, which allows to link seperate callback functions to different topics.
+simpilfied with the new `on()`-methods, which allow to link seperate callback functions to different topics.
 
-There are two variants of the `on()` method:
+There are two variants of the `on()`-method:
  * In the first variant, the API for the method `on()` is equivalent to the `subscribe()` method. 
    The parameters are the same:
 	`ESPPubSubClientWrapper& on(const char* topic, MQTT_CALLBACK_SIGNATURE, uint8_t qos = 0);` 
-	- in this case the callback needs to be a function as defined by `MQTT_CALLBACK_SIGNATURE2`, which is a function of 
+	- in this case the callback needs to be a function as defined by `MQTT_CALLBACK_SIGNATURE`, which is a function of 
 		type `void callback(char *topic, uint8_t* payload, unsigned int payloadLen);`
 
  * As with MQTT the payload usally is plain text, that can be simplified by using the second variant for which the API
  	is defined as 
    	`ESPPubSubClientWrapper& on(const char* topic, MQTT_CALLBACK_SIGNATURE2, uint8_t qos = 0);`
-	- in this case the callback needs to be a function as defined by `MQTT_CALLBACK_SIGNATURE`, which is a function of 
+	- in this case the callback needs to be a function as defined by `MQTT_CALLBACK_SIGNATURE2`, which is a function of 
 		type `void callback(char *topic, char* payload);`
-	- if no payload was sent with the message, `payload` will equal `NULL`, otherwise payload will be a standard 
+	- if no payload was sent with the message, `payload` will be equal to `NULL`, otherwise payload will be a standard 
 	  `char *` (with terminating 0)
 
 The following will apply for either variant:
