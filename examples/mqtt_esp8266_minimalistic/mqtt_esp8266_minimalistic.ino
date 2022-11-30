@@ -9,12 +9,28 @@ ESPPubSubClientWrapper client(mqtt_server);
 
   
   
-void callbackHello(char* topic, byte* payload, unsigned int length) {
-  Serial.println("Message ""hello"" received");
+void callbackHello(char* topic, char * payload) {
+  Serial.println("\r\nMessage ""hello"" received");
+  if (payload)
+  {
+    Serial.printf("Payload-len=%d, Payload=\"%s\"\r\n", strlen(payload), payload);
+  }
+  else
+    Serial.println("Payload is NULL.");
 }
 
-void callbackWorld(char* topic, byte* payload, unsigned int length) {
-  Serial.println("Message ""world"" received");
+void callbackWorld(char* topic, uint8_t* payload, unsigned int payloadLen) {
+  Serial.println("\r\nMessage ""world"" received");
+  if (payload)
+  {
+    char s[payloadLen + 1];
+    memcpy(s, payload, payloadLen);
+    s[payloadLen] = '\0';
+    Serial.printf("Payload-len=%d, Payload=\"%s\"\r\n", payloadLen, s);
+  }
+  else
+    Serial.println("Payload is NULL.");
+
 }
 
 void setup() {
