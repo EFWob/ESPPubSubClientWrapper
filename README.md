@@ -46,7 +46,7 @@ The main additions to the base class are:
 
 By default, you can use only one central callback to react on incoming messages using the `subscribe()` method. If you 
 subscribe to multiple topics, you have to check each incoming topic and select the appropriate reaction. This is 
-simpilfied with the new `on()` methods, which allows to link seperate callback funtions to different topics.
+simpilfied with the new `on()` methods, which allows to link seperate callback functions to different topics.
 
 There are two variants of the `on()` method:
  * In the first variant, the API for the method `on()` is equivalent to the `subscribe()` method. 
@@ -72,6 +72,8 @@ The following will apply for either variant:
 	callback1);client.on("#", callback2);`. The second topic subscription matches also topics that match the first call 
 	to `on()`. In that case not all matching callbacks fire but the order of subscription is relevant. In the given example, 
     each incoming message that matches `"test/#"` will fire `callback1()` while all other topics are matched to `callback2()`.
+ * The pointer to the payload is only valid during the callback. If you want to use it outside the scope of the callback
+   function, you have to create a local copy for the application (same as for the `subscribe()`-method)
 	
 
 ## Minimalistic Example
@@ -97,13 +99,36 @@ const char* mqtt_server = "broker.mqtt-dashboard.com";
 ESPPubSubClientWrapper client(mqtt_server);
 
   
-  
-void callbackHello(char* topic, byte* payload, unsigned int length) {
-  Serial.println("Message ""hello"" received");
+/*
+This function will be called if topic "hello" is received on MQTT and echo the payload on Serial monitor.
+It uses the simplified API with payload being converted to a 0 terminated char pointer (or NULL if no payload was sent)
+*/  
+void callbackHello(char* topic, char * payload) {
+  Serial.println("\r\nMessage ""hello"" received");
+  if (payload)
+  {
+    Serial.printf("Payload-len=%d, Payload=\"%s\"\r\n", strlen(payload), payload);
+  }
+  else
+    Serial.println("Payload is NULL.");
 }
 
-void callbackWorld(char* topic, byte* payload, unsigned int length) {
-  Serial.println("Message ""world"" received");
+/*
+This function will be called if topic "world" is received on MQTT and echo the payload on Serial monitor.
+It uses the default API with payload as uint_8-array with valid length given by payloadLen (0, if no payload was sent)
+*/  
+void callbackWorld(char* topic, uint8_t* payload, unsigned int payloadLen) {
+  Serial.println("\r\nMessage ""world"" received");
+  if (payload)
+  {
+    char s[payloadLen + 1];
+    memcpy(s, payload, payloadLen);
+    s[payloadLen] = '\0';
+    Serial.printf("Payload-len=%d, Payload=\"%s\"\r\n", payloadLen, s);
+  }
+  else
+    Serial.println("Payload is NULL.");
+
 }
 
 void setup() {
