@@ -4,6 +4,7 @@
 class onEventItem {
 public:
 	onEventItem(const char *t, MQTT_CALLBACK_SIGNATURE, uint8_t qos);
+	onEventItem(const char *t, MQTT_CALLBACK_SIGNATURE2, uint8_t qos);
 	boolean topicMatch(char *value);
 	char * topic;
 	uint16_t hasHash;
@@ -11,39 +12,61 @@ public:
 	uint8_t qos;
 	bool subscribed;
 	MQTT_CALLBACK_SIGNATURE;
+	MQTT_CALLBACK_SIGNATURE2;
 	onEventItem* _next = NULL;
 	friend class ESPPubSubClientWrapper;
+protected:
+	bool setValues(const char *t, uint8_t qos);
+
 };
 
 #if defined(QUEUE_CALLBACKS)
 class PendingCallbackItem {
 public:
-	PendingCallbackItem(char *topic, uint8_t *payload, unsigned int payloadLen, MQTT_CALLBACK_SIGNATURE) {
-		_topic = strdup(topic);
-		if (payload && payloadLen) {
-			_payload = (uint8_t *)malloc(payloadLen);
-			if (_payload)
-				memcpy(_payload, payload, payloadLen);
-			_payloadLen = payloadLen;
-		}
-		else {
-			_payload = NULL;
-			_payloadLen = 0;
-		}
+	PendingCallbackItem(char *topic, uint8_t *payload, unsigned int payloadLen, MQTT_CALLBACK_SIGNATURE) {	
+		setValues(topic, payload, payloadLen);
 		this->callback = callback;	
+		this->callback2 = NULL;
 	};		
-	
+
+	PendingCallbackItem(char *topic, uint8_t *payload, unsigned int payloadLen, MQTT_CALLBACK_SIGNATURE2) {	
+		setValues(topic, payload, payloadLen);
+		this->callback2 = callback2;	
+		this->callback = NULL;
+	};		
+
+
 	~PendingCallbackItem() {
 		if (_topic)
 			free(_topic);
 		if (_payload)
 			free(_payload);
 	};
-	
+
+protected:
+	void setValues(char *topic, uint8_t *payload, unsigned int payloadLen) {	
+		_topic = strdup(topic);
+		if (payload && payloadLen) {
+			_payload = (uint8_t *)malloc(payloadLen + 1);
+			if (_payload)
+			{
+				memcpy(_payload, payload, payloadLen);
+				_payload[payloadLen] = 0;
+			}
+			_payloadLen = payloadLen;
+		}
+		else {
+			_payload = NULL;
+			_payloadLen = 0;
+		}
+
+	};
+
 	char * _topic;
 	uint8_t* _payload;
 	unsigned int _payloadLen;
 	MQTT_CALLBACK_SIGNATURE;
+	MQTT_CALLBACK_SIGNATURE2;
 	PendingCallbackItem* _next = NULL;
 	friend class ESPPubSubClientWrapper;
 };
@@ -116,6 +139,8 @@ PendingCallbackItem *callBackItem;
 	while (callBackItem = _firstPendingCallback) {
 		if (callBackItem->callback)
 			callBackItem->callback(callBackItem->_topic, callBackItem->_payload, callBackItem->_payloadLen);
+		else if (callBackItem->callback2)
+			callBackItem->callback2(callBackItem->_topic, (char *)callBackItem->_payload);
 		if (NULL == (_firstPendingCallback = callBackItem->_next))
 			_lastPendingCallback = NULL;
 		delete callBackItem;
@@ -317,31 +342,63 @@ int i;
 
 	if (found) {
 		MQTT_CALLBACK_SIGNATURE = found->callback;
-		if (NULL == callback)
+		if ((NULL == callback) && (NULL == found->callback2))
 			callback = this->callback;
-		if (callback) {
+		if (callback || (found->callback2)) {
 #if defined(QUEUE_CALLBACKS)
 //	_pendingCallbacks.push_back(new PendingCallbackItem(topic, payload, payloadLen, _onEvents[i]->callback));
-			PendingCallbackItem* pendingCallback = new PendingCallbackItem(topic, payload, payloadLen, callback);
+			PendingCallbackItem* pendingCallback;
+			if (callback) 
+				pendingCallback = new PendingCallbackItem(topic, payload, payloadLen, callback);
+			else
+				pendingCallback = new PendingCallbackItem(topic, payload, payloadLen, found->callback2);
+
 			if (_lastPendingCallback)
 				_lastPendingCallback->_next = pendingCallback;
 			else
 				_firstPendingCallback = pendingCallback;
 			_lastPendingCallback = pendingCallback;
 #else
-			callback(topic, payload, payloadLen);	
+			if (callback)
+				callback(topic, payload, payloadLen);	
+			else
+			{
+				char *s = (char*)malloc(payloadLen + 1);
+				if (s)
+				{
+					memcpy(s, payload, payloadLen);
+					s[payloadLen] = 0;
+					found->callback2(topic, s);
+					free(s);
+				}
+
+			}	
 #endif
 		}
 	}
 }
 
 boolean ESPPubSubClientWrapper::subscribe(const char* topic, uint8_t qos) {
-	this->on(topic, NULL, qos);
+	this->on(topic, (std::function<void(char*, uint8_t*, unsigned int)>)NULL, qos);
 	return true;
 }
 
 ESPPubSubClientWrapper& ESPPubSubClientWrapper::on(const char* topic, MQTT_CALLBACK_SIGNATURE, uint8_t qos) {
 onEventItem *onEvent = new onEventItem(topic, callback, qos);
+	if (NULL == _firstOnEvent)
+		_firstOnEvent = onEvent;
+	else
+		_lastOnEvent->_next = onEvent;
+	_lastOnEvent = onEvent;
+	//Verkettung sollte passen. _onEvents wird hier nicht mehr benötigt	
+//	_onEvents.push_back(onEvent);
+	if (STATE_MQTT_LOOP == _stateNb)
+		onEvent->subscribed = PubSubClient::subscribe(onEvent->topic, onEvent->qos);
+	return *this;
+}
+
+ESPPubSubClientWrapper& ESPPubSubClientWrapper::on(const char* topic, MQTT_CALLBACK_SIGNATURE2, uint8_t qos) {
+onEventItem *onEvent = new onEventItem(topic, callback2, qos);
 	if (NULL == _firstOnEvent)
 		_firstOnEvent = onEvent;
 	else
@@ -385,6 +442,19 @@ onEventItem *prev = NULL;
 
 
 onEventItem::onEventItem(const char *t, MQTT_CALLBACK_SIGNATURE, uint8_t qos) {
+	this->callback2 = NULL;
+	if (setValues(t, qos))
+		this->callback = callback;
+}
+
+onEventItem::onEventItem(const char *t, MQTT_CALLBACK_SIGNATURE2, uint8_t qos) {
+	this->callback = NULL;
+	if (setValues(t, qos))
+		this->callback2 = callback2;
+}
+
+
+bool onEventItem::setValues(const char *t, uint8_t qos) {
 	if (topic = strdup(t)) {
 		char *hashPos = strchr(topic, '#');
 		if (hashPos != NULL) {
@@ -396,7 +466,11 @@ onEventItem::onEventItem(const char *t, MQTT_CALLBACK_SIGNATURE, uint8_t qos) {
 		hasLevelWildcard = strchr(topic, '+') != NULL;		
 		this->callback = callback;
 		this->qos = qos;
-	};
+		return true;
+	}
+	else
+		return false;
+
 }
 
 boolean onEventItem::topicMatch(char *value) {
