@@ -1,3 +1,8 @@
+# Latest changes
+*20221130*
+  - Readme and [example](#minimalistic-example) updated.
+  - Additional (simplified) version to use the [on()-method](#improved-callback-handling) to subscribe to topics.
+
 # Arduino ESP8266/ESP32 Client for MQTT using PubSubClient-Library
 
 This library provides a client for doing simple publish/subscribe messaging with
@@ -5,8 +10,8 @@ a server that supports MQTT. It wraps the functionality of the PubSubClient-Libr
 by deriving a wrapper class from PubSubClient class.
 
 The main additions to the base class are:
- * the `on()` method that allows a link of a specific topic to a specific callback (i. e. you
-    no longer have to parse the incoming topics to link them to specific actions in your sketch).
+ * the [on()-method](#improved-callback-handling) that allows a link of a specific topic to a specific callback 
+   (i. e. yoy no longer have to parse the incoming topics to link them to specific actions in your sketch).
  * The connection/reconnection is handled whithin the `loop()` method. That means you no longer need
     to wait for WiFi-layer to be established before connecting to the MQTT-Server or subscribing to topics. 
 
@@ -51,8 +56,7 @@ simpilfied with the new `on()` methods, which allows to link seperate callback f
 There are two variants of the `on()` method:
  * In the first variant, the API for the method `on()` is equivalent to the `subscribe()` method. 
    The parameters are the same:
-	`ESPPubSubClientWrapper& on(const char* topic, MQTT_CALLBACK_SIGNATURE, uint8_t qos = 0);` however the return value is 
-	a reference to the calling object thus allowing to chain multiple calls to `on()`.
+	`ESPPubSubClientWrapper& on(const char* topic, MQTT_CALLBACK_SIGNATURE, uint8_t qos = 0);` 
 	- in this case the callback needs to be a function as defined by `MQTT_CALLBACK_SIGNATURE2`, which is a function of 
 		type `void callback(char *topic, uint8_t* payload, unsigned int payloadLen);`
 
@@ -65,6 +69,8 @@ There are two variants of the `on()` method:
 	  `char *` (with terminating 0)
 
 The following will apply for either variant:
+ * the return value (which can be ignored) is a reference to the calling object thus allowing to chain multiple calls 
+   to `on()`.
  * The topics used for calling `on()` can include the MQTT-Wildcards `#` and `+`.
  * There is no fixed limit on subscriptions that can be made using `on()`. In practice the number is limited by available 
    memory (RAM), as the topic for each subscriptions has to be stored as RAM copy. 
