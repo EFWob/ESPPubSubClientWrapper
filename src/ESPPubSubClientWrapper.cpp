@@ -165,7 +165,7 @@ PendingCallbackItem *callBackItem;
 			break;
 		case STATE_MQTT_RECONNECT:
 			if (_firstRetry || (millis() - _stateStartTime > 5000)) {
-				const char *s = _clientID;
+				const char *s = _connect_id;
 				String clientIdStr;
 				if (NULL == s) {
 					clientIdStr = "ESPClient-";

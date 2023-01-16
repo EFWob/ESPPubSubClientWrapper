@@ -98,7 +98,6 @@ class ESPPubSubClientWrapper : public PubSubClient {
     void runState(int16_t stateNb);
 	boolean doSetConnect(const char* id, const char* user, const char* pass, const char* willTopic, 
 						uint8_t willQos, boolean willRetain, const char* willMessage, boolean cleanSession);
-	char* _clientID = NULL;
 	CALLBACK_SIGNATURE_VOID_UINT16 _cbConnect = NULL;
 	CALLBACK_SIGNATURE_VOID_UINT16 _cbDisc = NULL;
 	CALLBACK_SIGNATURE_BOOL_UINT16 _cbConnectFail = NULL;
