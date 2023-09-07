@@ -12,6 +12,7 @@
 #define CALLBACK_SIGNATURE_VOID_UINT16 std::function<void(uint16_t)> 
 #define CALLBACK_SIGNATURE_BOOL_UINT16 std::function<bool(uint16_t)> 
 #define MQTT_CALLBACK_SIGNATURE2 std::function<void(char*, char*)> callback2
+#define MQTT_CALLBACK_SIGNATURE3 std::function<void(char*, char*, void*)> callback3
 
 class onEventItem;
 class PendingCallbackItem;
@@ -84,6 +85,7 @@ class ESPPubSubClientWrapper : public PubSubClient {
 	*/
 	ESPPubSubClientWrapper& on(const char* topic, MQTT_CALLBACK_SIGNATURE, uint8_t qos = 0);
 	ESPPubSubClientWrapper& on(const char* topic, MQTT_CALLBACK_SIGNATURE2, uint8_t qos = 0);
+	ESPPubSubClientWrapper& on(const char* topic, MQTT_CALLBACK_SIGNATURE3, void *data, uint8_t qos = 0);
 	ESPPubSubClientWrapper& onConnect(CALLBACK_SIGNATURE_VOID_UINT16 callback);
 	ESPPubSubClientWrapper& onDisconnect(CALLBACK_SIGNATURE_VOID_UINT16 callback);
 	ESPPubSubClientWrapper& onConnectFail(CALLBACK_SIGNATURE_BOOL_UINT16 callback);
