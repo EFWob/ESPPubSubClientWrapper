@@ -3,19 +3,23 @@
 
 class onEventItem {
 public:
+/*
 	onEventItem(const char *t, MQTT_CALLBACK_SIGNATURE, uint8_t qos);
 	onEventItem(const char *t, MQTT_CALLBACK_SIGNATURE2, uint8_t qos);
 	onEventItem(const char *t, MQTT_CALLBACK_SIGNATURE3, void *data, uint8_t qos);
+*/
+	onEventItem(char *t, MQTT_CALLBACK_SIGNATURE1 , MQTT_CALLBACK_SIGNATURE2, 
+					MQTT_CALLBACK_SIGNATURE3, void *d, uint8_t q);
 	~onEventItem();
 	boolean topicMatch(char *value);
 	char * topic;
 	uint16_t hasHash;
 	bool hasLevelWildcard;
 	uint8_t qos;
-	bool subscribed;
-	MQTT_CALLBACK_SIGNATURE;
-	MQTT_CALLBACK_SIGNATURE2;
-	MQTT_CALLBACK_SIGNATURE3;
+	bool subscribed = false;
+	MQTT_CALLBACK_SIGNATURE1 callback1;
+	MQTT_CALLBACK_SIGNATURE2 callback2;
+	MQTT_CALLBACK_SIGNATURE3 callback3;
 	void *data;
 	onEventItem* _next = NULL;
 	friend class ESPPubSubClientWrapper;
@@ -27,19 +31,19 @@ protected:
 #if defined(QUEUE_CALLBACKS)
 class PendingCallbackItem {
 public:
-	PendingCallbackItem(char *topic, uint8_t *payload, unsigned int payloadLen, MQTT_CALLBACK_SIGNATURE) {	
+	PendingCallbackItem(char *topic, uint8_t *payload, unsigned int payloadLen, MQTT_CALLBACK_SIGNATURE1 cb1) {	
 		setValues(topic, payload, payloadLen);
-		this->callback = callback;	
+		this->callback1 = cb1;	
 	};		
 
-	PendingCallbackItem(char *topic, uint8_t *payload, unsigned int payloadLen, MQTT_CALLBACK_SIGNATURE2) {	
+	PendingCallbackItem(char *topic, uint8_t *payload, unsigned int payloadLen, MQTT_CALLBACK_SIGNATURE2 cb2) {	
 		setValues(topic, payload, payloadLen);
-		this->callback2 = callback2;	
+		this->callback2 = cb2;	
 	};		
 
-	PendingCallbackItem(char *topic, uint8_t *payload, unsigned int payloadLen, MQTT_CALLBACK_SIGNATURE3, void *data) {	
+	PendingCallbackItem(char *topic, uint8_t *payload, unsigned int payloadLen, MQTT_CALLBACK_SIGNATURE3 cb3, void *data) {	
 		setValues(topic, payload, payloadLen);
-		this->callback3 = callback3;	
+		this->callback3 = cb3;	
 		this->data = data;
 	};		
 
@@ -53,9 +57,9 @@ public:
 
 protected:
 	void setValues(char *topic, uint8_t *payload, unsigned int payloadLen) {	
-		callback = NULL;
-		callback2 = NULL;
-		callback3 = NULL;
+		callback1 = nullptr;
+		callback2 = nullptr;
+		callback3 = nullptr;
 		data = NULL;
 		_topic = strdup(topic);
 		if (payload && payloadLen) {
@@ -77,9 +81,9 @@ protected:
 	char * _topic;
 	uint8_t* _payload;
 	unsigned int _payloadLen;
-	MQTT_CALLBACK_SIGNATURE;
-	MQTT_CALLBACK_SIGNATURE2;
-	MQTT_CALLBACK_SIGNATURE3;
+	MQTT_CALLBACK_SIGNATURE1 callback1;
+	MQTT_CALLBACK_SIGNATURE2 callback2;
+	MQTT_CALLBACK_SIGNATURE3 callback3;
 	void *data;
 	PendingCallbackItem* _next = NULL;
 	friend class ESPPubSubClientWrapper;
@@ -151,8 +155,8 @@ int wifiStatus = WiFi.status();
 PendingCallbackItem *callBackItem;
 #if defined(QUEUE_CALLBACKS)
 	while (callBackItem = _firstPendingCallback) {
-		if (callBackItem->callback)
-			callBackItem->callback(callBackItem->_topic, callBackItem->_payload, callBackItem->_payloadLen);
+		if (callBackItem->callback1)
+			callBackItem->callback1(callBackItem->_topic, callBackItem->_payload, callBackItem->_payloadLen);
 		else if (callBackItem->callback2)
 			callBackItem->callback2(callBackItem->_topic, (char *)callBackItem->_payload);
 		else if (callBackItem->callback3)
@@ -357,27 +361,34 @@ int i;
 		}
 
 	if (found) {
-		MQTT_CALLBACK_SIGNATURE = found->callback;
-		if ((NULL == callback) && (NULL == found->callback2) && (NULL == found->callback3))
-			callback = this->callback;
-		if (callback || (found->callback2) || (found->callback3)) {
+		Serial.printf("Found: %s, cb1=%d, cb2=%d, cb3=%d\r\n", found->topic,
+			found->callback1 != nullptr, found->callback2 != nullptr, 
+			found->callback3 != nullptr);Serial.flush();
+		MQTT_CALLBACK_SIGNATURE1 callback1 = found->callback1;
+		if (!callback1 && !found->callback2 && !found->callback3) {
+			callback1 = this->callback;
+			Serial.println("Using default callback!");Serial.flush();
+		}
+		if (callback1 || found->callback2 || found->callback3) {
 #if defined(QUEUE_CALLBACKS)
 //	_pendingCallbacks.push_back(new PendingCallbackItem(topic, payload, payloadLen, _onEvents[i]->callback));
-			PendingCallbackItem* pendingCallback;
-			if (callback) 
-				pendingCallback = new PendingCallbackItem(topic, payload, payloadLen, callback);
+			PendingCallbackItem* pendingCallback = NULL;
+			if (callback1) 
+				pendingCallback = new PendingCallbackItem(topic, payload, payloadLen, callback1);
 			else if (found->callback2)
 				pendingCallback = new PendingCallbackItem(topic, payload, payloadLen, found->callback2);
 			else if (found->callback3)
 				pendingCallback = new PendingCallbackItem(topic, payload, payloadLen, found->callback3, found->data);
-			if (_lastPendingCallback)
-				_lastPendingCallback->_next = pendingCallback;
-			else
-				_firstPendingCallback = pendingCallback;
-			_lastPendingCallback = pendingCallback;
+			if (pendingCallback) {
+				if (_lastPendingCallback)
+					_lastPendingCallback->_next = pendingCallback;
+				else
+					_firstPendingCallback = pendingCallback;
+				_lastPendingCallback = pendingCallback;
+			}
 #else
-			if (callback)
-				callback(topic, payload, payloadLen);	
+			if (callback1)
+				callback1(topic, payload, payloadLen);	
 			else
 			{
 				char *s = (char*)malloc(payloadLen + 1);
@@ -387,8 +398,10 @@ int i;
 					s[payloadLen] = 0;
 					if (found->callback2)
 						found->callback2(topic, s);
-					else if (found->callback3)
+					else if (found->callback3) {
+						Serial.printf("Using Callback3 with data: %ld\r\n", found->data);Serial.flush();
 						found->callback3(topic, s, found->data);
+					}
 					free(s);
 				}
 
@@ -399,12 +412,39 @@ int i;
 }
 
 boolean ESPPubSubClientWrapper::subscribe(const char* topic, uint8_t qos) {
-	this->on(topic, (std::function<void(char*, uint8_t*, unsigned int)>)NULL, qos);
+	newOnEvent(topic, nullptr, nullptr, nullptr, NULL, qos);
 	return true;
 }
 
-ESPPubSubClientWrapper& ESPPubSubClientWrapper::on(const char* topic, MQTT_CALLBACK_SIGNATURE, uint8_t qos) {
-onEventItem *onEvent = new onEventItem(topic, callback, qos);
+void ESPPubSubClientWrapper::newOnEvent(const char* topic, MQTT_CALLBACK_SIGNATURE1 cb1,
+		MQTT_CALLBACK_SIGNATURE2 cb2, MQTT_CALLBACK_SIGNATURE3 cb3, void *data, uint8_t qos) {
+	if (topic) {
+		Serial.println("Start newOnEvent");Serial.flush();
+		char *t = strdup(topic);
+		Serial.println("newOnEvent Topic duplicated");Serial.flush();
+		if (t) {
+			Serial.println("Start new onEventItem");Serial.flush();
+			Serial.printf("topic=%s, cb1=%ld, cb2=%ld, cb3=%ld\r\n", t, cb1, cb2, cb3);Serial.flush();
+			onEventItem *onEvent = new onEventItem(t, cb1, cb2, cb3, data, qos); 
+			Serial.println("onEventItem created");Serial.flush();
+			if (NULL == _firstOnEvent)
+				_firstOnEvent = onEvent;
+			else
+				_lastOnEvent->_next = onEvent;
+			_lastOnEvent = onEvent;
+			Serial.println("onEventItem chained");Serial.flush();
+			if (STATE_MQTT_LOOP == _stateNb)
+				onEvent->subscribed = PubSubClient::subscribe(onEvent->topic, onEvent->qos);
+		}
+	}
+}
+
+
+ESPPubSubClientWrapper& ESPPubSubClientWrapper::on(const char* topic, MQTT_CALLBACK_SIGNATURE1 cb1, uint8_t qos) {
+	newOnEvent(topic, cb1, nullptr, nullptr, NULL, qos);
+/*
+onEventItem *onEvent = new onEventItem(topic, callback, NULL, NULL, NULL, qos, 
+			&_firstOnEvent, &_lastOnEvent);
 	if (NULL == _firstOnEvent)
 		_firstOnEvent = onEvent;
 	else
@@ -414,10 +454,15 @@ onEventItem *onEvent = new onEventItem(topic, callback, qos);
 //	_onEvents.push_back(onEvent);
 	if (STATE_MQTT_LOOP == _stateNb)
 		onEvent->subscribed = PubSubClient::subscribe(onEvent->topic, onEvent->qos);
+	*/
 	return *this;
 }
 
-ESPPubSubClientWrapper& ESPPubSubClientWrapper::on(const char* topic, MQTT_CALLBACK_SIGNATURE2, uint8_t qos) {
+ESPPubSubClientWrapper& ESPPubSubClientWrapper::on(const char* topic, MQTT_CALLBACK_SIGNATURE2 cb2, uint8_t qos) {
+	newOnEvent(topic, nullptr, cb2, nullptr, NULL, qos);
+/*
+onEventItem *onEvent = new onEventItem(topic, NULL, callback2, NULL, NULL, qos, 
+			&_firstOnEvent, &_lastOnEvent);
 onEventItem *onEvent = new onEventItem(topic, callback2, qos);
 	if (NULL == _firstOnEvent)
 		_firstOnEvent = onEvent;
@@ -426,12 +471,18 @@ onEventItem *onEvent = new onEventItem(topic, callback2, qos);
 	_lastOnEvent = onEvent;
 	//Verkettung sollte passen. _onEvents wird hier nicht mehr benötigt	
 //	_onEvents.push_back(onEvent);
+
 	if (STATE_MQTT_LOOP == _stateNb)
 		onEvent->subscribed = PubSubClient::subscribe(onEvent->topic, onEvent->qos);
+*/
 	return *this;
 }
 
-ESPPubSubClientWrapper& ESPPubSubClientWrapper::on(const char* topic, MQTT_CALLBACK_SIGNATURE3, void *data, uint8_t qos) {
+ESPPubSubClientWrapper& ESPPubSubClientWrapper::on(const char* topic, MQTT_CALLBACK_SIGNATURE3 cb3, void *data, uint8_t qos) {
+	newOnEvent(topic, nullptr, nullptr, cb3, data, qos);
+/*
+onEventItem *onEvent = new onEventItem(topic, NULL, NULL, callback3, data, qos, 
+			&_firstOnEvent, &_lastOnEvent);
 onEventItem *onEvent = new onEventItem(topic, callback3, data, qos);
 	if (NULL == _firstOnEvent)
 		_firstOnEvent = onEvent;
@@ -440,8 +491,10 @@ onEventItem *onEvent = new onEventItem(topic, callback3, data, qos);
 	_lastOnEvent = onEvent;
 	//Verkettung sollte passen. _onEvents wird hier nicht mehr benötigt	
 //	_onEvents.push_back(onEvent);
+
 	if (STATE_MQTT_LOOP == _stateNb)
 		onEvent->subscribed = PubSubClient::subscribe(onEvent->topic, onEvent->qos);
+*/
 	return *this;
 }
 
@@ -464,17 +517,33 @@ onEventItem *prev = NULL;
 			_lastOnEvent = prev;
 		if (this->connected())
 			ret = PubSubClient::unsubscribe(onEvent->topic);
-		if (onEvent->topic)
-			free(onEvent->topic);
-		delete onEvent;
-		
+		delete onEvent;		
 	}
 	return ret;
 }
 
 
 
+onEventItem::onEventItem(char* t, MQTT_CALLBACK_SIGNATURE1 cb1 , MQTT_CALLBACK_SIGNATURE2 cb2,
+		MQTT_CALLBACK_SIGNATURE3 cb3, void *d, uint8_t q) {
+			this->topic = t;
+			char *hashPos = strchr(this->topic, '#');
+			if (hashPos != NULL) {
+				this->hasHash = 1 + hashPos - this->topic; 
+				hashPos[1] = 0;
+			}
+			else
+				this->hasHash = 0;
+			hasLevelWildcard = strchr(this->topic, '+') != NULL;	
+			this->callback1 = cb1;
+			this->callback2 = cb2;
+			this->callback3 = cb3;
+			this->qos = q;
+			this->data = d;
+			_next = NULL;
+}
 
+/*
 onEventItem::onEventItem(const char *t, MQTT_CALLBACK_SIGNATURE, uint8_t qos) {
 	if (setValues(t, qos))
 		this->callback = callback;
@@ -492,6 +561,32 @@ onEventItem::onEventItem(const char *t, MQTT_CALLBACK_SIGNATURE3, void *data, ui
 	}
 }
 
+onEventItem::onEventItem(const char *t, MQTT_CALLBACK_SIGNATURE, MQTT_CALLBACK_SIGNATURE2, 
+					MQTT_CALLBACK_SIGNATURE3, void *data, uint8_t qos, 
+					onEventItem** first, onEventItem** last) {
+
+	if (this->topic = strdup(t)) {
+		char *hashPos = strchr(this->topic, '#');
+		if (hashPos != NULL) {
+			this->hasHash = 1 + hashPos - this->topic; 
+			hashPos[1] = 0;
+		}
+		else
+			this->hasHash = 0;
+		hasLevelWildcard = strchr(topic, '+') != NULL;	
+		this->callback = callback;
+		this->callback2 = callback2;
+		this->callback3 = callback3;
+		this->data = data;
+		this->qos = qos;
+		if (NULL == *first)
+			*first = this;
+		else
+			(*last)->next = this;
+		*last = this;
+	}
+}
+*/
 
 
 onEventItem::~onEventItem() {
@@ -499,6 +594,7 @@ onEventItem::~onEventItem() {
 		free(topic);
 }
 
+/*
 bool onEventItem::setValues(const char *t, uint8_t qos) {
 	callback = NULL;
 	callback2 = NULL;
@@ -521,6 +617,7 @@ bool onEventItem::setValues(const char *t, uint8_t qos) {
 		return false;
 
 }
+*/
 
 boolean onEventItem::topicMatch(char *value) {
 char *pattern = topic;

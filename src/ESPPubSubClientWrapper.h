@@ -11,8 +11,9 @@
 #include <functional>
 #define CALLBACK_SIGNATURE_VOID_UINT16 std::function<void(uint16_t)> 
 #define CALLBACK_SIGNATURE_BOOL_UINT16 std::function<bool(uint16_t)> 
-#define MQTT_CALLBACK_SIGNATURE2 std::function<void(char*, char*)> callback2
-#define MQTT_CALLBACK_SIGNATURE3 std::function<void(char*, char*, void*)> callback3
+#define MQTT_CALLBACK_SIGNATURE1 std::function<void(char*, uint8_t*, unsigned int)>
+#define MQTT_CALLBACK_SIGNATURE2 std::function<void(char*, char*)> 
+#define MQTT_CALLBACK_SIGNATURE3 std::function<void(char*, char*, void*)> 
 
 class onEventItem;
 class PendingCallbackItem;
@@ -83,7 +84,7 @@ class ESPPubSubClientWrapper : public PubSubClient {
 		
 		As a rule of thumb, define the most specific (detailed) topics first before going down to more generic ones.
 	*/
-	ESPPubSubClientWrapper& on(const char* topic, MQTT_CALLBACK_SIGNATURE, uint8_t qos = 0);
+	ESPPubSubClientWrapper& on(const char* topic, MQTT_CALLBACK_SIGNATURE1, uint8_t qos = 0);
 	ESPPubSubClientWrapper& on(const char* topic, MQTT_CALLBACK_SIGNATURE2, uint8_t qos = 0);
 	ESPPubSubClientWrapper& on(const char* topic, MQTT_CALLBACK_SIGNATURE3, void *data, uint8_t qos = 0);
 	ESPPubSubClientWrapper& onConnect(CALLBACK_SIGNATURE_VOID_UINT16 callback);
@@ -95,9 +96,13 @@ class ESPPubSubClientWrapper : public PubSubClient {
 	boolean publish_waitConnected(const char* topic, const uint8_t * payload, unsigned int plength, boolean retained);
 	boolean loop();
   protected:
+    void newOnEvent(const char* topic, MQTT_CALLBACK_SIGNATURE1,
+		MQTT_CALLBACK_SIGNATURE2, MQTT_CALLBACK_SIGNATURE3, void *data, uint8_t qos);
 	void setState(int16_t stateNb);
     void receivedCallback(char* topic, byte* payload, unsigned int length); 
     void runState(int16_t stateNb);
+	void setOn(const char* topic, MQTT_CALLBACK_SIGNATURE, MQTT_CALLBACK_SIGNATURE2, MQTT_CALLBACK_SIGNATURE3,
+				void *data, uint8_t qos);
 	boolean doSetConnect(const char* id, const char* user, const char* pass, const char* willTopic, 
 						uint8_t willQos, boolean willRetain, const char* willMessage, boolean cleanSession);
 	CALLBACK_SIGNATURE_VOID_UINT16 _cbConnect = NULL;
