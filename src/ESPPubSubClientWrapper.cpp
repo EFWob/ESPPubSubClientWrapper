@@ -150,6 +150,27 @@ void ESPPubSubClientWrapper::setState(int16_t newState) {
 }
 
 
+const char* ESPPubSubClientWrapper::getSubscription(int i, void **data) {
+const char* ret = NULL;	
+onEventItem *p = _firstOnEvent;
+	while (p && (ret == NULL)) {
+		if (i) {
+			i--;
+			p = p->_next;
+		}
+		else {
+			ret = p->topic;
+			if (ret) {
+				if (*data)
+					if (p->callback3)
+						*data = p->data;
+			} else	
+				p = NULL;
+		}
+	}	
+	return ret;
+}
+
 boolean ESPPubSubClientWrapper::loop() {
 int wifiStatus = WiFi.status();	
 PendingCallbackItem *callBackItem;
@@ -362,8 +383,9 @@ int i;
 
 	if (found) {
 		Serial.printf("Found: %s, cb1=%d, cb2=%d, cb3=%d\r\n", found->topic,
-			found->callback1 != nullptr, found->callback2 != nullptr, 
-			found->callback3 != nullptr);Serial.flush();
+			(bool)found->callback1, (bool)found->callback2, 
+			(bool)found->callback3);Serial.flush();
+		Serial.printf("FWIW: sizeof(cb1)=%d\r\n", sizeof(found->callback1));	
 		MQTT_CALLBACK_SIGNATURE1 callback1 = found->callback1;
 		if (!callback1 && !found->callback2 && !found->callback3) {
 			callback1 = this->callback;
@@ -590,6 +612,9 @@ onEventItem::onEventItem(const char *t, MQTT_CALLBACK_SIGNATURE, MQTT_CALLBACK_S
 
 
 onEventItem::~onEventItem() {
+	if (callback3)	
+		if (data)
+			callback3(topic, NULL, data);
 	if (topic)
 		free(topic);
 }

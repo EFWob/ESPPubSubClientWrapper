@@ -51,6 +51,11 @@ class ESPPubSubClientWrapper : public PubSubClient {
 	*/
 	boolean unsubscribe(const char* topic);	
 	
+	/*
+		hasSubsciption() returns true, if a subscription is already made for the given topic
+		if **data is not NULL, *data will return the subscription specific data (if given)
+	*/
+	boolean hasSubscription(const char* topic, void **data = NULL);
 	
 	/*
 		Compatibility function. Sets the "global" callback for each topic subscribed to by the subscribe()-method.
@@ -60,10 +65,18 @@ class ESPPubSubClientWrapper : public PubSubClient {
 	ESPPubSubClientWrapper& setCallback(MQTT_CALLBACK_SIGNATURE);
 	
 	/*
-		Simplified API to attach a specific callbacks to a specific copy.
+		Simplified API to attach a specific callbacks to a specific topic.
 		As long as memory lasts, any number of matching pairs can be defined.
-		If NULL is given as second parameter (the callback) the "global" callback will be used (in that case there is
+		If <nullptr> is given as second parameter (the callback) the "global" callback will be used (in that case there is
 		no difference to the subscribe()-method above).
+			If a third parameter is supplied, the second parameter is expected to be a std::function
+			object to a callback with 3 parameters(char *topic, char *payload, void *data), of which:
+				- the first parameter is the matching topic (0 terminated)
+				- the second parameter is the received payload (0 terminated)
+				- the third parameter will be set to data.
+			The application is responsible that the pointer to data remains valid 
+			If the topic is unsubscribed, the callback will be called with payload set to NULL (to
+			allow the application to free the memory pointed to by "data")
 		As with subscribe(), this method can be called even if the client is not (yet) connected. As mentioned before,
 		once the connection is (re-)established, all outstanding subscriptions resulting from calls to the on()-method 
 		will be resolved.
@@ -95,6 +108,7 @@ class ESPPubSubClientWrapper : public PubSubClient {
 	boolean publish_waitConnected(const char* topic, const uint8_t * payload, unsigned int plength);
 	boolean publish_waitConnected(const char* topic, const uint8_t * payload, unsigned int plength, boolean retained);
 	boolean loop();
+	const char* getSubscription(int i, void **data = NULL);
   protected:
     void newOnEvent(const char* topic, MQTT_CALLBACK_SIGNATURE1,
 		MQTT_CALLBACK_SIGNATURE2, MQTT_CALLBACK_SIGNATURE3, void *data, uint8_t qos);
